@@ -147,13 +147,15 @@ class AIAgentService {
     if (result['status'] == 'success') {
       final data = result['data'];
       
-      // 根据用户要求，所有语音记账都使用当前时间
-      final finalDate = DateTime.now();
+      // 优先使用AI返回的日期，如果为空或解析失败，则使用当前日期作为备用
+      final finalDate = data['date'] != null
+          ? DateTime.tryParse(data['date']) ?? DateTime.now()
+          : DateTime.now();
 
       return Expense(
         title: data['title'] ?? '未命名交易',
         amount: data['amount'] is num ? data['amount'].toDouble() : double.tryParse(data['amount']?.toString() ?? '0') ?? 0,
-        date: finalDate, // 强制使用当前日期
+        date: finalDate,
         type: data['type'] ?? 'expense',
         category: data['category'] ?? '其他',
         description: data['description'],
