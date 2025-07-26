@@ -13,8 +13,8 @@ import 'vehicle_expense_screen.dart';
 class HomeController extends GetxController {
   final DatabaseService _databaseService = DatabaseService();
   
-  bool isLoading = true;
-  List<Expense> expenses = [];
+  final isLoading = true.obs;
+  final expenses = <Expense>[].obs;
 
   @override
   void onInit() {
@@ -23,16 +23,14 @@ class HomeController extends GetxController {
   }
 
   Future<void> loadExpenses() async {
-    isLoading = true;
-    update(); // 通知UI开始加载
+    isLoading.value = true;
 
     try {
-      expenses = await _databaseService.getExpenses();
+      expenses.assignAll(await _databaseService.getExpenses());
     } catch (e) {
       Get.snackbar('错误', '加载支出数据失败: $e');
     } finally {
-      isLoading = false;
-      update(); // 通知UI加载完成
+      isLoading.value = false;
     }
   }
 
@@ -56,7 +54,7 @@ class HomeController extends GetxController {
             e.type == 'expense' && 
             !e.date.isBefore(firstDayOfMonth) && 
             e.date.isBefore(firstDayOfNextMonth))
-        .fold(0, (sum, e) => sum + e.amount);
+        .fold(0.0, (sum, e) => sum + e.amount);
   }
 
   double get monthlyIncome {
@@ -69,7 +67,7 @@ class HomeController extends GetxController {
             e.type == 'income' && 
             !e.date.isBefore(firstDayOfMonth) && 
             e.date.isBefore(firstDayOfNextMonth))
-        .fold(0, (sum, e) => sum + e.amount);
+        .fold(0.0, (sum, e) => sum + e.amount);
   }
 
   double get monthlyBalance => monthlyIncome - monthlyExpense;
@@ -81,8 +79,8 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 将 GetBuilder 作为根组件，确保 controller 在整个 Scaffold 中都可用
-    return GetBuilder<HomeController>(
+    // 将 GetX 作为根组件，以响应式地监听状态变化
+    return GetX<HomeController>(
       init: HomeController(), // 正确初始化控制器
       builder: (controller) {
         return Scaffold(
@@ -112,7 +110,7 @@ class HomeScreen extends StatelessWidget {
 
   // Body 的构建逻辑
   Widget _buildBody(HomeController controller) {
-    if (controller.isLoading) {
+    if (controller.isLoading.value) {
       return const Center(child: CircularProgressIndicator());
     }
 

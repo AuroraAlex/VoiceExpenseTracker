@@ -36,13 +36,12 @@ class AIAgentService {
     }
 
     try {
-      final requestBody = {
-        'model': model,
-        'messages': [
-          {
-              'role': 'system',
-              'content': '''
+      final now = DateTime.now();
+      final formattedDate = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+      final systemPrompt = '''
 你是一个专业的语音记账助手，帮助用户从语音描述中提取交易信息（支出或收入）。
+当前日期是 $formattedDate。请优先使用此日期作为交易日期，除非用户明确指定了其他日期。
+
 请分析用户的语音输入，并判断是支出还是收入。
 
 如果输入内容包含记账信息，请按以下JSON格式返回：
@@ -74,7 +73,14 @@ class AIAgentService {
   "status": "unrelated",
   "message": "输入内容与记账无关，请描述您的支出信息"
 }
-'''
+''';
+
+      final requestBody = {
+        'model': model,
+        'messages': [
+          {
+            'role': 'system',
+            'content': systemPrompt,
           },
           {
             'role': 'user',
@@ -141,10 +147,13 @@ class AIAgentService {
     if (result['status'] == 'success') {
       final data = result['data'];
       
+      // 根据用户要求，所有语音记账都使用当前时间
+      final finalDate = DateTime.now();
+
       return Expense(
         title: data['title'] ?? '未命名交易',
         amount: data['amount'] is num ? data['amount'].toDouble() : double.tryParse(data['amount']?.toString() ?? '0') ?? 0,
-        date: data['date'] != null ? DateTime.tryParse(data['date']) ?? DateTime.now() : DateTime.now(),
+        date: finalDate, // 强制使用当前日期
         type: data['type'] ?? 'expense',
         category: data['category'] ?? '其他',
         description: data['description'],
