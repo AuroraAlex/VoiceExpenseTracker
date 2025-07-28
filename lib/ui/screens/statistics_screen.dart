@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../models/expense.dart';
 import '../../services/database_service.dart';
 import '../../services/ai_agent_service.dart';
@@ -464,9 +465,26 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                       child: Text('点击"生成报告"按钮获取AI分析'),
                     ),
                   )
-                : Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Text(_aiReport),
+                : Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    padding: const EdgeInsets.all(12.0),
+                    child: MarkdownBody(
+                      data: _aiReport,
+                      styleSheet: MarkdownStyleSheet(
+                        h1: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue),
+                        h2: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        h3: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                        p: const TextStyle(fontSize: 14),
+                        listBullet: const TextStyle(fontSize: 14),
+                        strong: const TextStyle(fontWeight: FontWeight.bold),
+                        blockquote: const TextStyle(fontStyle: FontStyle.italic, color: Colors.grey),
+                        tableBody: const TextStyle(fontSize: 12),
+                      ),
+                    ),
                   ),
           ],
         ),

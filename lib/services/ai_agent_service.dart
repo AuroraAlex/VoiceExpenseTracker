@@ -194,22 +194,61 @@ class AIAgentService {
     }
 
     try {
+      // 按月份分组支出数据
+      final Map<String, List<Expense>> expensesByMonth = {};
+      for (var expense in expenses) {
+        final monthKey = '${expense.date.year}-${expense.date.month.toString().padLeft(2, '0')}';
+        if (!expensesByMonth.containsKey(monthKey)) {
+          expensesByMonth[monthKey] = [];
+        }
+        expensesByMonth[monthKey]!.add(expense);
+      }
+
+      // 计算每月总支出
+      final Map<String, double> monthlyTotals = {};
+      expensesByMonth.forEach((month, monthExpenses) {
+        monthlyTotals[month] = monthExpenses.fold(0.0, (sum, e) => sum + e.amount);
+      });
+
+      // 获取当前月份和上个月份
+      final now = DateTime.now();
+      final currentMonthKey = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+      
+      // 计算上个月的键
+      final lastMonth = now.month == 1 ? DateTime(now.year - 1, 12) : DateTime(now.year, now.month - 1);
+      final lastMonthKey = '${lastMonth.year}-${lastMonth.month.toString().padLeft(2, '0')}';
+
       // 将支出数据转换为简单的文本格式
       final expensesText = expenses.map((e) => 
-        '日期: ${e.date.toString().substring(0, 10)}, 标题: ${e.title}, 金额: ${e.amount}, 分类: ${e.category}'
+        '日期: ${e.date.toString().substring(0, 10)}, 标题: ${e.title}, 金额: ${e.amount}, 分类: ${e.category}, 类型: ${e.type}'
       ).join('\n');
 
-      final systemPrompt = '''
-你是一个专业的财务分析师，帮助用户分析他们的支出数据并提供有用的见解。
-请分析以下支出数据，并提供一份详细的报告，包括：
-1. 总支出和总收入
-2. 按分类的支出分布（金额和百分比）
-3. 最大的支出项目
-4. 支出趋势分析
-5. 节省开支的具体建议
-6. 财务健康状况评估
+      // 添加月度比较信息
+      String monthlyComparisonText = '';
+      if (monthlyTotals.containsKey(currentMonthKey) && monthlyTotals.containsKey(lastMonthKey)) {
+        final currentMonthTotal = monthlyTotals[currentMonthKey]!;
+        final lastMonthTotal = monthlyTotals[lastMonthKey]!;
+        final difference = currentMonthTotal - lastMonthTotal;
+        final percentChange = (difference / lastMonthTotal) * 100;
+        
+        monthlyComparisonText = '''
+当前月份: $currentMonthKey, 总支出: ¥${currentMonthTotal.toStringAsFixed(2)}
+上个月份: $lastMonthKey, 总支出: ¥${lastMonthTotal.toStringAsFixed(2)}
+变化: ¥${difference.toStringAsFixed(2)} (${percentChange.toStringAsFixed(2)}%)
+''';
+      }
 
-请使用清晰的标题和小标题组织你的报告，使其易于阅读。
+      final systemPrompt = '''
+你是一个简洁高效的财务分析师，帮助用户分析他们的支出数据并提供有用的见解。
+
+请分析以下支出数据，并提供一份简明的报告，重点关注：
+1. 本月消费水平与上月相比的变化（增加还是减少，变化幅度）
+2. 本月主要消费在哪些类别，占比如何
+3. 消费趋势是否合理，有无异常消费
+4. 针对用户消费习惯的1-2条具体建议
+
+请使用Markdown格式输出，使用简洁的标题和要点，避免冗长的描述。
+报告应当简短精炼，重点突出，不超过300字。
 ''';
 
       final requestBody = {
@@ -221,7 +260,10 @@ class AIAgentService {
           },
           {
             'role': 'user',
-            'content': '以下是我的支出数据，请帮我分析：\n$expensesText'
+            'content': '''以下是我的支出数据，请帮我分析：
+$monthlyComparisonText
+详细支出记录：
+$expensesText'''
           }
         ],
         'temperature': 0.7,
