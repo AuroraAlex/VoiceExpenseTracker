@@ -180,4 +180,187 @@ class AIAgentService {
       return '未知状态';
     }
   }
+  
+  // 分析支出数据并生成报告
+  Future<String> generateExpenseReport(List<Expense> expenses) async {
+    // 检查网络连接
+    final connectivityResult = await (Connectivity().checkConnectivity());
+    if (connectivityResult.contains(ConnectivityResult.none)) {
+      throw Exception('无网络连接，无法使用AI服务');
+    }
+
+    if (apiKey == null || apiUrl == null || model == null) {
+      throw Exception('API配置缺失');
+    }
+
+    try {
+      // 将支出数据转换为简单的文本格式
+      final expensesText = expenses.map((e) => 
+        '日期: ${e.date.toString().substring(0, 10)}, 标题: ${e.title}, 金额: ${e.amount}, 分类: ${e.category}'
+      ).join('\n');
+
+      final systemPrompt = '''
+你是一个专业的财务分析师，帮助用户分析他们的支出数据并提供有用的见解。
+请分析以下支出数据，并提供一份详细的报告，包括：
+1. 总支出和总收入
+2. 按分类的支出分布（金额和百分比）
+3. 最大的支出项目
+4. 支出趋势分析
+5. 节省开支的具体建议
+6. 财务健康状况评估
+
+请使用清晰的标题和小标题组织你的报告，使其易于阅读。
+''';
+
+      final requestBody = {
+        'model': model,
+        'messages': [
+          {
+            'role': 'system',
+            'content': systemPrompt,
+          },
+          {
+            'role': 'user',
+            'content': '以下是我的支出数据，请帮我分析：\n$expensesText'
+          }
+        ],
+        'temperature': 0.7,
+      };
+
+      // 打印请求体
+      debugPrint('--- 报告生成请求 ---');
+      debugPrint(jsonEncode(requestBody));
+
+      final response = await http.post(
+        Uri.parse(apiUrl!),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $apiKey',
+        },
+        body: jsonEncode(requestBody),
+      ).timeout(const Duration(seconds: 60)); // 增加超时时间，因为报告生成可能需要更长时间
+
+      // 打印响应
+      debugPrint('--- 报告生成响应 (状态码: ${response.statusCode}) ---');
+      debugPrint(response.body);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes)); // 使用utf8解码以支持中文
+        final content = data['choices'][0]['message']['content'];
+        return content;
+      } else {
+        throw Exception('API请求失败: ${response.statusCode} ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('生成报告失败: $e'); // 增加错误日志
+      throw Exception('生成报告失败: $e');
+    }
+  }
+  
+  // 分析车辆支出数据
+  Future<Map<String, dynamic>> analyzeVehicleExpense(String voiceText) async {
+    // 检查网络连接
+    final connectivityResult = await (Connectivity().checkConnectivity());
+    if (connectivityResult.contains(ConnectivityResult.none)) {
+      return {'status': 'error', 'message': '无网络连接，无法使用AI服务'};
+    }
+
+    if (apiKey == null || apiUrl == null || model == null) {
+      return {'status': 'error', 'message': 'API配置缺失'};
+    }
+
+    try {
+      final systemPrompt = '''
+你是一个专业的汽车支出分析助手，帮助用户从描述中提取车辆支出信息。
+请提取以下信息并以JSON格式返回：
+
+如果输入内容包含车辆支出信息，请按以下JSON格式返回：
+{
+  "status": "success",
+  "data": {
+    "title": "交易标题",
+    "amount": 金额数字,
+    "date": "YYYY-MM-DD格式的日期，如果没有则使用当前日期",
+    "type": "expense",
+    "category": "汽车",
+    "description": "可选的详细描述",
+    "mileage": 当前总里程数（数字）,
+    "consumption": 加油量（升）或充电量（度）（数字）,
+    "vehicleType": "车辆类型（例如：汽油车, 电动车）"
+  }
+}
+
+如果输入内容无法识别为车辆支出信息，请返回：
+{
+  "status": "error",
+  "message": "无法识别车辆支出信息，请重新描述"
+}
+''';
+
+      final requestBody = {
+        'model': model,
+        'messages': [
+          {
+            'role': 'system',
+            'content': systemPrompt,
+          },
+          {
+            'role': 'user',
+            'content': voiceText
+          }
+        ],
+        'temperature': 0.5, // 降低温度以获得更确定的结果
+      };
+
+      // 打印请求体
+      debugPrint('--- 车辆支出分析请求 ---');
+      debugPrint(jsonEncode(requestBody));
+
+      final response = await http.post(
+        Uri.parse(apiUrl!),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $apiKey',
+        },
+        body: jsonEncode(requestBody),
+      ).timeout(const Duration(seconds: 30)); // 添加30秒超时
+
+      // 打印响应
+      debugPrint('--- 车辆支出分析响应 (状态码: ${response.statusCode}) ---');
+      debugPrint(response.body);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes)); // 使用utf8解码以支持中文
+        final content = data['choices'][0]['message']['content'];
+        
+        debugPrint('--- 车辆支出分析返回内容 ---');
+        debugPrint(content);
+        
+        try {
+          // 使用正则表达式从返回内容中提取纯净的JSON字符串
+          final regex = RegExp(r'```json\s*([\s\S]*?)\s*```');
+          final match = regex.firstMatch(content);
+          
+          String jsonString;
+          if (match != null) {
+            // 如果找到了Markdown代码块，就提取其中的内容
+            jsonString = match.group(1)!;
+          } else {
+            // 如果没有找到，就假定整个内容是JSON（以防万一）
+            jsonString = content;
+          }
+
+          final Map<String, dynamic> result = jsonDecode(jsonString);
+          return result;
+        } catch (e) {
+          throw Exception('无法解析AI返回的JSON内容: $e');
+        }
+      } else {
+        throw Exception('API请求失败: ${response.statusCode} ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('车辆支出分析失败: $e'); // 增加错误日志
+      return {'status': 'error', 'message': '车辆支出分析失败: $e'};
+    }
+  }
 }

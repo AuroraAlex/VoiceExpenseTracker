@@ -4,7 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import '../../models/expense.dart';
 import '../../services/database_service.dart';
-import '../../services/ai_service.dart';
+import '../../services/ai_agent_service.dart';
 import '../../services/config_service.dart';
 
 class StatisticsScreen extends StatefulWidget {
@@ -92,11 +92,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     });
 
     try {
-      final aiConfig = _configService.getAiApiConfig();
-      final aiService = AIService(
-        apiKey: aiConfig['apiKey'],
-        apiUrl: aiConfig['apiUrl'],
-      );
+      // 使用AIAgentService替代AIService
+      final aiService = AIAgentService.fromConfig();
       
       final report = await aiService.generateExpenseReport(_expenses);
       
