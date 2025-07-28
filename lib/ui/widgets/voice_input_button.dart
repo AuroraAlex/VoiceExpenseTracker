@@ -47,7 +47,7 @@ class _VoiceInputButtonState extends State<VoiceInputButton> {
     });
 
     try {
-      final result = await _aiAgentService.processVoiceText(trimmed);
+      final result = await _aiAgentService.processRecordInput(trimmed);
       final expense = _aiAgentService.createExpenseFromResult(result, trimmed);
 
       if (expense != null) {

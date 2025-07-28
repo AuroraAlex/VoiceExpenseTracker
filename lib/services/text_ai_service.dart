@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/expense.dart';
 import 'config_service.dart';
+import '../utils/ai_prompts.dart';
 
 /// 文本AI服务，用于处理文本输入并提取记账信息
 class TextAIService {
@@ -24,7 +25,7 @@ class TextAIService {
   }
 
   /// 处理文本输入，提取记账信息
-  Future<Map<String, dynamic>> processText(String text) async {
+  Future<Map<String, dynamic>> processRecordInput(String text) async {
     // 检查网络连接
     final connectivityResult = await (Connectivity().checkConnectivity());
     if (connectivityResult.contains(ConnectivityResult.none)) {
@@ -38,42 +39,7 @@ class TextAIService {
     try {
       final now = DateTime.now();
       final formattedDate = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
-      final systemPrompt = '''
-你是一个专业的记账助手，帮助用户从文本描述中提取交易信息（支出或收入）。
-当前日期是 $formattedDate。请优先使用此日期作为交易日期，除非用户明确指定了其他日期。
-
-请分析用户的输入，并判断是支出还是收入。
-
-如果输入内容包含记账信息，请按以下JSON格式返回：
-{
-  "status": "success",
-  "data": {
-    "title": "交易标题",
-    "amount": 金额数字,
-    "date": "YYYY-MM-DD格式的日期，如果没有则使用当前日期",
-    "type": "交易类型，必须是 'expense' (支出) 或 'income' (收入)",
-    "category": "分类名称，对于支出，必须从以下选择一个：餐饮、购物、交通、住宿、娱乐、医疗、教育、旅行、汽车、其他。对于收入，分类可以是：工资、奖金、投资、其他收入",
-    "description": "可选的详细描述",
-    
-    // --- 仅当 category 为 '汽车' 时，才需要包含以下字段 ---
-    "mileage": "可选，当前总里程数（数字）",
-    "consumption": "可选，加油量（升）或充电量（度）",
-    "vehicleType": "可选，车辆类型（例如：汽油车, 电动车）"
-  }
-}
-
-如果输入内容无法识别为记账信息，请返回：
-{
-  "status": "error",
-  "message": "无法识别记账信息，请重新描述您的支出"
-}
-
-如果输入内容与记账无关，请返回：
-{
-  "status": "unrelated",
-  "message": "输入内容与记账无关，请描述您的支出信息"
-}
-''';
+      final systemPrompt = AIPrompts.getVoiceExpensePrompt(formattedDate);
 
       final requestBody = {
         'model': model,

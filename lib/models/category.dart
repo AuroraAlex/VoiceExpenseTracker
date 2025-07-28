@@ -62,6 +62,7 @@ class Category {
     Category(name: '教育', icon: 'school', color: '#3F51B5'),
     Category(name: '旅行', icon: 'flight', color: '#00BCD4'),
     Category(name: '汽车', icon: 'directions_car', color: '#607D8B'),
+    Category(name: '油/电耗', icon: 'local_gas_station', color: '#FF5722'),
     Category(name: '其他', icon: 'more_horiz', color: '#9E9E9E'),
   ];
 }

@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../models/expense.dart';
 import '../models/category.dart';
 import 'config_service.dart';
+import '../utils/ai_prompts.dart';
 
 class AIAgentService {
   final String? apiKey;
@@ -23,8 +24,8 @@ class AIAgentService {
     );
   }
 
-  // 处理语音识别文本，提取记账信息
-  Future<Map<String, dynamic>> processVoiceText(String voiceText) async {
+  // 处理语音或文本输入，提取记账信息
+  Future<Map<String, dynamic>> processRecordInput(String inputText) async {
     // 检查网络连接
     final connectivityResult = await (Connectivity().checkConnectivity());
     if (connectivityResult.contains(ConnectivityResult.none)) {
@@ -38,42 +39,7 @@ class AIAgentService {
     try {
       final now = DateTime.now();
       final formattedDate = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
-      final systemPrompt = '''
-你是一个专业的语音记账助手，帮助用户从语音描述中提取交易信息（支出或收入）。
-当前日期是 $formattedDate。请优先使用此日期作为交易日期，除非用户明确指定了其他日期。
-
-请分析用户的语音输入，并判断是支出还是收入。
-
-如果输入内容包含记账信息，请按以下JSON格式返回：
-{
-  "status": "success",
-  "data": {
-    "title": "交易标题",
-    "amount": 金额数字,
-    "date": "YYYY-MM-DD格式的日期，如果没有则使用当前日期",
-    "type": "交易类型，必须是 'expense' (支出) 或 'income' (收入)",
-    "category": "分类名称，对于支出，必须从以下选择一个：餐饮、购物、交通、住宿、娱乐、医疗、教育、旅行、汽车、其他。对于收入，分类可以是：工资、奖金、投资、其他收入",
-    "description": "可选的详细描述",
-    
-    // --- 仅当 category 为 '汽车' 时，才需要包含以下字段 ---
-    "mileage": "可选，当前总里程数（数字）",
-    "consumption": "可选，加油量（升）或充电量（度）",
-    "vehicleType": "可选，车辆类型（例如：汽油车, 电动车）"
-  }
-}
-
-如果输入内容无法识别为记账信息，请返回：
-{
-  "status": "error",
-  "message": "无法识别记账信息，请重新描述您的支出"
-}
-
-如果输入内容与记账无关，请返回：
-{
-  "status": "unrelated",
-  "message": "输入内容与记账无关，请描述您的支出信息"
-}
-''';
+      final systemPrompt = AIPrompts.getVoiceExpensePrompt(formattedDate);
 
       final requestBody = {
         'model': model,
@@ -84,7 +50,7 @@ class AIAgentService {
           },
           {
             'role': 'user',
-            'content': voiceText
+            'content': inputText
           }
         ],
         'temperature': 0.5, // 降低温度以获得更确定的结果
@@ -238,18 +204,7 @@ class AIAgentService {
 ''';
       }
 
-      final systemPrompt = '''
-你是一个简洁高效的财务分析师，帮助用户分析他们的支出数据并提供有用的见解。
-
-请分析以下支出数据，并提供一份简明的报告，重点关注：
-1. 本月消费水平与上月相比的变化（增加还是减少，变化幅度）
-2. 本月主要消费在哪些类别，占比如何
-3. 消费趋势是否合理，有无异常消费
-4. 针对用户消费习惯的1-2条具体建议
-
-请使用Markdown格式输出，使用简洁的标题和要点，避免冗长的描述。
-报告应当简短精炼，重点突出，不超过300字。
-''';
+      final systemPrompt = AIPrompts.getExpenseReportPrompt();
 
       final requestBody = {
         'model': model,
@@ -312,32 +267,7 @@ $expensesText'''
     }
 
     try {
-      final systemPrompt = '''
-你是一个专业的汽车支出分析助手，帮助用户从描述中提取车辆支出信息。
-请提取以下信息并以JSON格式返回：
-
-如果输入内容包含车辆支出信息，请按以下JSON格式返回：
-{
-  "status": "success",
-  "data": {
-    "title": "交易标题",
-    "amount": 金额数字,
-    "date": "YYYY-MM-DD格式的日期，如果没有则使用当前日期",
-    "type": "expense",
-    "category": "汽车",
-    "description": "可选的详细描述",
-    "mileage": 当前总里程数（数字）,
-    "consumption": 加油量（升）或充电量（度）（数字）,
-    "vehicleType": "车辆类型（例如：汽油车, 电动车）"
-  }
-}
-
-如果输入内容无法识别为车辆支出信息，请返回：
-{
-  "status": "error",
-  "message": "无法识别车辆支出信息，请重新描述"
-}
-''';
+      final systemPrompt = AIPrompts.getVehicleExpensePrompt();
 
       final requestBody = {
         'model': model,

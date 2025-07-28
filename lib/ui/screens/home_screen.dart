@@ -12,7 +12,7 @@ import '../../models/expense.dart';
 import 'add_expense_screen.dart';
 import 'settings_screen.dart';
 import 'statistics_screen.dart';
-import 'vehicle_expense_screen.dart';
+import 'vehicle_expense_detail_screen.dart';
 
 // 1. GetX控制器
 class HomeController extends GetxController {
@@ -523,7 +523,7 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         FloatingActionButton(
           heroTag: 'vehicle',
-          onPressed: () => Get.to(() => const VehicleExpenseScreen())?.then((_) => controller.loadExpenses()),
+          onPressed: () => Get.to(() => const VehicleExpenseDetailScreen())?.then((_) => controller.loadExpenses()),
           backgroundColor: Colors.blue,
           tooltip: '车辆支出',
           child: const Icon(Icons.directions_car),

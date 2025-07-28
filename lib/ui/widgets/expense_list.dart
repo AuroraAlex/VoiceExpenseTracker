@@ -7,12 +7,16 @@ class ExpenseList extends StatelessWidget {
   final List<Expense> expenses;
   final Function(Expense) onDelete;
   final Function(Expense) onEdit;
+  final bool shrinkWrap;
+  final ScrollPhysics? physics;
 
   const ExpenseList({
     Key? key,
     required this.expenses,
     required this.onDelete,
     required this.onEdit,
+    this.shrinkWrap = false,
+    this.physics,
   }) : super(key: key);
 
   @override
@@ -23,6 +27,8 @@ class ExpenseList extends StatelessWidget {
 
     return ListView.builder(
       itemCount: sortedExpenses.length,
+      shrinkWrap: shrinkWrap,
+      physics: physics,
       itemBuilder: (context, index) {
         final expense = sortedExpenses[index];
         return _buildExpenseItem(context, expense);

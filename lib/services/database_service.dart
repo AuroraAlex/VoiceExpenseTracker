@@ -23,7 +23,7 @@ class DatabaseService {
     String path = join(await getDatabasesPath(), 'expense_tracker.db');
     return await openDatabase(
       path,
-      version: 2, // 增加版本号以触发升级
+      version: 5, // 增加版本号以触发升级
       onCreate: _createDatabase,
       onUpgrade: _upgradeDatabase,
     );
@@ -42,8 +42,12 @@ class DatabaseService {
         description TEXT,
         voiceRecord TEXT,
         mileage REAL,
+        previousMileage REAL,
         consumption REAL,
-        vehicleType TEXT
+        vehicleType TEXT,
+        fuelEfficiency REAL,
+        expenseSubtype TEXT,
+        mileageUpdateTime TEXT
       )
     ''');
 
@@ -71,6 +75,22 @@ class DatabaseService {
       await db.execute('ALTER TABLE expenses ADD COLUMN vehicleType TEXT');
       // 删除旧的vehicle_expenses表
       await db.execute('DROP TABLE IF EXISTS vehicle_expenses');
+    }
+    
+    if (oldVersion < 3) {
+      // 从版本2升级到版本3：添加新的车辆相关字段
+      await db.execute('ALTER TABLE expenses ADD COLUMN fuelEfficiency REAL');
+      await db.execute('ALTER TABLE expenses ADD COLUMN expenseSubtype TEXT');
+    }
+    
+    if (oldVersion < 4) {
+      // 从版本3升级到版本4：添加里程表更新时间字段
+      await db.execute('ALTER TABLE expenses ADD COLUMN mileageUpdateTime TEXT');
+    }
+    
+    if (oldVersion < 5) {
+      // 从版本4升级到版本5：添加上一次表显里程字段
+      await db.execute('ALTER TABLE expenses ADD COLUMN previousMileage REAL');
     }
   }
 

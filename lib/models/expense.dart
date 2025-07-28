@@ -9,9 +9,13 @@ class Expense {
   final String? voiceRecord;
 
   // 车辆相关可选字段
-  final double? mileage; // 里程数
+  final double? mileage; // 表显里程数
+  final DateTime? mileageUpdateTime; // 表显里程更新时间
+  final double? previousMileage; // 上一次表显里程数
   final double? consumption; // 消耗量（升/度）
   final String? vehicleType; // 车辆类型：汽油车/电动车
+  final double? fuelEfficiency; // 百公里油/电耗
+  final String? expenseSubtype; // 支出子类型，例如：油/电耗、保养、停车等
 
   Expense({
     this.id,
@@ -23,8 +27,12 @@ class Expense {
     this.description,
     this.voiceRecord,
     this.mileage,
+    this.mileageUpdateTime,
+    this.previousMileage,
     this.consumption,
     this.vehicleType,
+    this.fuelEfficiency,
+    this.expenseSubtype,
   });
 
   // 从JSON映射到对象
@@ -39,8 +47,14 @@ class Expense {
       description: json['description'],
       voiceRecord: json['voiceRecord'],
       mileage: json['mileage'],
+      mileageUpdateTime: json['mileageUpdateTime'] != null 
+          ? DateTime.parse(json['mileageUpdateTime']) 
+          : null,
+      previousMileage: json['previousMileage'],
       consumption: json['consumption'],
       vehicleType: json['vehicleType'],
+      fuelEfficiency: json['fuelEfficiency'],
+      expenseSubtype: json['expenseSubtype'],
     );
   }
 
@@ -56,8 +70,12 @@ class Expense {
       'description': description,
       'voiceRecord': voiceRecord,
       'mileage': mileage,
+      'mileageUpdateTime': mileageUpdateTime?.toIso8601String(),
+      'previousMileage': previousMileage,
       'consumption': consumption,
       'vehicleType': vehicleType,
+      'fuelEfficiency': fuelEfficiency,
+      'expenseSubtype': expenseSubtype,
     };
   }
 
@@ -73,8 +91,12 @@ class Expense {
       'description': description,
       'voiceRecord': voiceRecord,
       'mileage': mileage,
+      'mileageUpdateTime': mileageUpdateTime?.toIso8601String(),
+      'previousMileage': previousMileage,
       'consumption': consumption,
       'vehicleType': vehicleType,
+      'fuelEfficiency': fuelEfficiency,
+      'expenseSubtype': expenseSubtype,
     };
   }
 
@@ -90,8 +112,14 @@ class Expense {
       description: map['description'],
       voiceRecord: map['voiceRecord'],
       mileage: map['mileage'],
+      mileageUpdateTime: map['mileageUpdateTime'] != null 
+          ? DateTime.parse(map['mileageUpdateTime']) 
+          : null,
+      previousMileage: map['previousMileage'],
       consumption: map['consumption'],
       vehicleType: map['vehicleType'],
+      fuelEfficiency: map['fuelEfficiency'],
+      expenseSubtype: map['expenseSubtype'],
     );
   }
 
@@ -106,8 +134,12 @@ class Expense {
     String? description,
     String? voiceRecord,
     double? mileage,
+    DateTime? mileageUpdateTime,
+    double? previousMileage,
     double? consumption,
     String? vehicleType,
+    double? fuelEfficiency,
+    String? expenseSubtype,
   }) {
     return Expense(
       id: id ?? this.id,
@@ -119,8 +151,12 @@ class Expense {
       description: description ?? this.description,
       voiceRecord: voiceRecord ?? this.voiceRecord,
       mileage: mileage ?? this.mileage,
+      mileageUpdateTime: mileageUpdateTime ?? this.mileageUpdateTime,
+      previousMileage: previousMileage ?? this.previousMileage,
       consumption: consumption ?? this.consumption,
       vehicleType: vehicleType ?? this.vehicleType,
+      fuelEfficiency: fuelEfficiency ?? this.fuelEfficiency,
+      expenseSubtype: expenseSubtype ?? this.expenseSubtype,
     );
   }
 }

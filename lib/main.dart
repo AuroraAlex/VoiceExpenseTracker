@@ -11,6 +11,7 @@ import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 import 'ui/screens/home_screen.dart';
 import 'ui/screens/sherpa_test_screen.dart';
 import 'ui/screens/text_input_test_screen.dart';
+import 'ui/screens/vehicle_expense_detail_screen.dart';
 import 'services/config_service.dart';
 import 'services/speech_service.dart';
 import 'services/sherpa_model_service.dart';
@@ -307,6 +308,7 @@ class _MyAppState extends State<MyApp> {
       routes: {
         '/sherpa_test': (context) => const SherpaTestScreen(),
         '/text_input_test': (context) => const TextInputTestScreen(),
+        '/vehicle_expense_detail': (context) => const VehicleExpenseDetailScreen(),
       },
       ),
     );

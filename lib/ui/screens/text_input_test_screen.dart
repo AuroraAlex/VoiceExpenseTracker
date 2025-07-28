@@ -39,7 +39,7 @@ class _TextInputTestScreenState extends State<TextInputTestScreen> {
     });
     
     try {
-      final result = await _textAIService.processText(text);
+      final result = await _textAIService.processRecordInput(text);
       final expense = _textAIService.createExpenseFromResult(result, text);
       
       setState(() {

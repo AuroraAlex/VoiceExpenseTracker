@@ -48,7 +48,7 @@ class _TextInputButtonState extends State<TextInputButton> {
 
     try {
       // 调用AI服务处理文本
-      final result = await _textAIService.processText(trimmed);
+      final result = await _textAIService.processRecordInput(trimmed);
       final expense = _textAIService.createExpenseFromResult(result, trimmed);
 
       if (expense != null) {

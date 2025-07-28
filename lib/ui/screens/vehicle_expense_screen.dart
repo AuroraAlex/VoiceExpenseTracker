@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../models/expense.dart';
 import '../../services/database_service.dart';
 import '../widgets/expense_list.dart'; // 复用主列表
+import 'vehicle_expense_detail_screen.dart';
 
 class VehicleExpenseScreen extends StatefulWidget {
   const VehicleExpenseScreen({Key? key}) : super(key: key);
@@ -51,6 +52,11 @@ class _VehicleExpenseScreenState extends State<VehicleExpenseScreen> {
       appBar: AppBar(
         title: const Text('车辆支出'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.analytics),
+            onPressed: () => Get.toNamed('/vehicle_expense_detail'),
+            tooltip: '详细分析',
+          ),
           IconButton(
             icon: const Icon(Icons.bar_chart),
             onPressed: _showEfficiencyChart,
