@@ -345,6 +345,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ],
                   ),
+                  
+                  const Divider(height: 32),
+                  
+                  // 测试功能
+                  _buildSectionTitle('测试功能'),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => Get.toNamed('/sherpa_test'),
+                          child: const Text('语音识别测试'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => Get.toNamed('/text_input_test'),
+                          child: const Text('文本输入测试'),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),

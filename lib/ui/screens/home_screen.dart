@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 import '../widgets/expense_list.dart';
 import '../widgets/voice_input_button.dart';
+import '../widgets/text_input_button.dart';
 import '../widgets/manual_model_dialog.dart';
 import '../widgets/model_download_choice_dialog.dart';
 import '../../services/database_service.dart';
@@ -420,14 +421,26 @@ class _HomeScreenState extends State<HomeScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: Column(
             children: [
-              _buildBalanceInfo('本月结余', '¥${controller.monthlyBalance.toStringAsFixed(2)}', Colors.blue, isTotal: true),
-              const Spacer(),
-              _buildBalanceInfo('本月支出', '¥${controller.monthlyExpense.toStringAsFixed(2)}', Colors.red, icon: Icons.arrow_downward),
-              const SizedBox(width: 24),
-              _buildBalanceInfo('本月收入', '¥${controller.monthlyIncome.toStringAsFixed(2)}', Colors.green, icon: Icons.arrow_upward),
+              // 结余信息
+              Row(
+                children: [
+                  _buildBalanceInfo('本月结余', '¥${controller.monthlyBalance.toStringAsFixed(2)}', Colors.blue, isTotal: true),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // 收支信息
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildBalanceInfo('本月支出', '¥${controller.monthlyExpense.toStringAsFixed(2)}', Colors.red, icon: Icons.arrow_downward, alignRight: false),
+                  ),
+                  Expanded(
+                    child: _buildBalanceInfo('本月收入', '¥${controller.monthlyIncome.toStringAsFixed(2)}', Colors.green, icon: Icons.arrow_upward, alignRight: true),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -435,18 +448,45 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildBalanceInfo(String label, String amount, Color color, {IconData? icon, bool isTotal = false}) {
+  Widget _buildBalanceInfo(String label, String amount, Color color, {IconData? icon, bool isTotal = false, bool alignRight = false}) {
+    // 处理金额显示，保留两位小数
+    String formattedAmount = amount;
+    if (amount.startsWith('¥')) {
+      try {
+        double value = double.parse(amount.substring(1));
+        formattedAmount = '¥${value.toStringAsFixed(2)}';
+      } catch (e) {
+        // 如果解析失败，保持原样
+      }
+    }
+    
     return Column(
-      crossAxisAlignment: isTotal ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+      crossAxisAlignment: alignRight ? CrossAxisAlignment.end : CrossAxisAlignment.start,
       children: [
         Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             if (icon != null) ...[Icon(icon, color: color, size: 16), const SizedBox(width: 4)],
             Text(label, style: const TextStyle(fontSize: 14, color: Colors.grey)),
           ],
         ),
-        if (isTotal) const SizedBox(height: 4),
-        Text(amount, style: TextStyle(fontSize: isTotal ? 24 : 16, fontWeight: FontWeight.bold, color: color)),
+        const SizedBox(height: 4),
+        // 使用FittedBox确保文本能够自动缩小以适应可用空间
+        Container(
+          width: isTotal ? 200 : 120, // 为文本提供足够的宽度
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: alignRight ? Alignment.centerRight : Alignment.centerLeft,
+            child: Text(
+              formattedAmount, 
+              style: TextStyle(
+                fontSize: isTotal ? 24 : 16, 
+                fontWeight: FontWeight.bold, 
+                color: color
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -489,12 +529,10 @@ class _HomeScreenState extends State<HomeScreen> {
           child: const Icon(Icons.directions_car),
         ),
         const SizedBox(height: 16),
-        FloatingActionButton(
-          heroTag: 'add',
-          onPressed: () => Get.to(() => const AddExpenseScreen())?.then((_) => controller.loadExpenses()),
-          backgroundColor: Colors.green,
-          tooltip: '手动添加',
-          child: const Icon(Icons.add),
+        TextInputButton(
+          onTextProcessed: (expense) {
+            controller.addExpense(expense);
+          },
         ),
         const SizedBox(height: 16),
         VoiceInputButton(

@@ -18,53 +18,53 @@ class AIService {
     );
   }
 
-  // 分析语音内容并提取支出信息
-  Future<Map<String, dynamic>> analyzeExpenseFromVoice(String voiceText) async {
-    if (apiKey == null || apiUrl == null) {
-      throw Exception('API配置缺失');
-    }
+  // // 分析语音内容并提取支出信息
+  // Future<Map<String, dynamic>> analyzeExpenseFromVoice(String voiceText) async {
+  //   if (apiKey == null || apiUrl == null) {
+  //     throw Exception('API配置缺失');
+  //   }
 
-    try {
-      final response = await http.post(
-        Uri.parse(apiUrl!),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $apiKey',
-        },
-        body: jsonEncode({
-          'model': 'gpt-3.5-turbo',
-          'messages': [
-            {
-              'role': 'system',
-              'content': '你是一个财务助手，帮助用户从语音描述中提取支出信息。请提取以下信息：标题、金额、日期（如果没有则使用当前日期）、分类（从以下分类中选择最匹配的一个：餐饮、购物、交通、住宿、娱乐、医疗、教育、旅行、汽车、其他）、描述（可选）。请以JSON格式返回结果。'
-            },
-            {
-              'role': 'user',
-              'content': voiceText
-            }
-          ],
-          'temperature': 0.7,
-        }),
-      );
+  //   try {
+  //     final response = await http.post(
+  //       Uri.parse(apiUrl!),
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //         'Authorization': 'Bearer $apiKey',
+  //       },
+  //       body: jsonEncode({
+  //         'model': 'gpt-3.5-turbo',
+  //         'messages': [
+  //           {
+  //             'role': 'system',
+  //             'content': '你是一个财务助手，帮助用户从语音描述中提取支出信息。请提取以下信息：标题、金额、日期（如果没有则使用当前日期）、分类（从以下分类中选择最匹配的一个：餐饮、购物、交通、住宿、娱乐、医疗、教育、旅行、汽车、其他）、描述（可选）。请以JSON格式返回结果。'
+  //           },
+  //           {
+  //             'role': 'user',
+  //             'content': voiceText
+  //           }
+  //         ],
+  //         'temperature': 0.7,
+  //       }),
+  //     );
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final content = data['choices'][0]['message']['content'];
+  //     if (response.statusCode == 200) {
+  //       final data = jsonDecode(response.body);
+  //       final content = data['choices'][0]['message']['content'];
         
-        // 尝试解析AI返回的JSON内容
-        try {
-          final Map<String, dynamic> expenseData = jsonDecode(content);
-          return expenseData;
-        } catch (e) {
-          throw Exception('无法解析AI返回的内容: $e');
-        }
-      } else {
-        throw Exception('API请求失败: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('AI分析失败: $e');
-    }
-  }
+  //       // 尝试解析AI返回的JSON内容
+  //       try {
+  //         final Map<String, dynamic> expenseData = jsonDecode(content);
+  //         return expenseData;
+  //       } catch (e) {
+  //         throw Exception('无法解析AI返回的内容: $e');
+  //       }
+  //     } else {
+  //       throw Exception('API请求失败: ${response.statusCode}');
+  //     }
+  //   } catch (e) {
+  //     throw Exception('AI分析失败: $e');
+  //   }
+  // }
 
   // 分析支出数据并生成报告
   Future<String> generateExpenseReport(List<Expense> expenses) async {

@@ -76,14 +76,26 @@ class ExpenseList extends StatelessWidget {
               size: 24,
             ),
           ),
-          title: Text(expense.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-          subtitle: Text('${expense.category} - ${DateFormat('MM-dd').format(expense.date)}'),
-          trailing: Text(
-            '${expense.type == 'income' ? '+' : '-'}¥${expense.amount.toStringAsFixed(2)}',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-              color: expense.type == 'income' ? Colors.green : Colors.red,
+          title: Text(
+            expense.title, 
+            style: const TextStyle(fontWeight: FontWeight.bold),
+            overflow: TextOverflow.ellipsis, // 添加溢出处理
+            maxLines: 1,
+          ),
+          subtitle: Text(
+            '${expense.category} - ${DateFormat('MM-dd').format(expense.date)}',
+            overflow: TextOverflow.ellipsis, // 添加溢出处理
+            maxLines: 1,
+          ),
+          trailing: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              '${expense.type == 'income' ? '+' : '-'}¥${expense.amount.toStringAsFixed(2)}',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: expense.type == 'income' ? Colors.green : Colors.red,
+              ),
             ),
           ),
           onTap: () => _showExpenseDetails(context, expense),
@@ -106,7 +118,7 @@ class ExpenseList extends StatelessWidget {
             _buildDetailRow('日期', DateFormat('yyyy-MM-dd').format(expense.date)),
             _buildDetailRow('分类', expense.category),
             if (expense.description != null && expense.description!.isNotEmpty)
-              _buildDetailRow('描述', expense.description!),
+              _buildDetailRow('描述', expense.description!, isMultiLine: true),
           ],
         ),
         actions: [
@@ -126,7 +138,7 @@ class ExpenseList extends StatelessWidget {
     );
   }
 
-  Widget _buildDetailRow(String label, String value) {
+  Widget _buildDetailRow(String label, String value, {bool isMultiLine = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
@@ -143,7 +155,11 @@ class ExpenseList extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: Text(value),
+            child: Text(
+              value,
+              overflow: isMultiLine ? TextOverflow.visible : TextOverflow.ellipsis,
+              maxLines: isMultiLine ? null : 1,
+            ),
           ),
         ],
       ),
