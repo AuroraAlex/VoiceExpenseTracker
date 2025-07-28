@@ -275,9 +275,14 @@ class _VoiceInputDialogState extends State<VoiceInputDialog>
     });
   }
 
-  void _confirmText() {
+  void _confirmText() async {
+    // 如果仍在监听，先停止以获取最终结果
+    if (_isListening) {
+      await _stopListening();
+    }
+
     final text = _isEditing ? _textController.text.trim() : _recognizedText.trim();
-    if (text.isNotEmpty) {
+    if (text.isNotEmpty && text != '未识别到内容') {
       widget.onTextConfirmed(text);
       Get.back();
     } else {
@@ -392,65 +397,63 @@ class _VoiceInputDialogState extends State<VoiceInputDialog>
   }
 
   Widget _buildListeningAnimation() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          AnimatedBuilder(
-            animation: _pulseAnimation,
-            builder: (context, child) {
-              return Transform.scale(
-                scale: _pulseAnimation.value,
-                child: Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.blue.shade300,
-                        Colors.blue.shade600,
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.blue.withOpacity(0.4),
-                        blurRadius: 20,
-                        spreadRadius: 5,
-                      ),
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        AnimatedBuilder(
+          animation: _pulseAnimation,
+          builder: (context, child) {
+            return Transform.scale(
+              scale: _pulseAnimation.value,
+              child: Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.blue.shade300,
+                      Colors.blue.shade600,
                     ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  child: Icon(
-                    Icons.mic,
-                    color: Colors.white,
-                    size: 30,
-                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.blue.withOpacity(0.4),
+                      blurRadius: 20,
+                      spreadRadius: 5,
+                    ),
+                  ],
                 ),
-              );
-            },
-          ),
-          const SizedBox(height: 12),
-          // 使用Expanded和SingleChildScrollView确保文本可以滚动
-          Expanded(
-            child: SingleChildScrollView(
-              controller: _scrollController,
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: Text(
-                _recognizedText.isEmpty ? '请开始说话...' : _recognizedText,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 16,
-                  color: _recognizedText.isEmpty ? Colors.blue.shade400 : Colors.blue.shade800,
-                  height: 1.4,
-                  fontWeight: FontWeight.w500,
+                child: Icon(
+                  Icons.mic,
+                  color: Colors.white,
+                  size: 30,
                 ),
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        // 使用Expanded和SingleChildScrollView确保文本可以滚动
+        Expanded(
+          child: SingleChildScrollView(
+            controller: _scrollController,
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Text(
+              _recognizedText.isEmpty ? '请开始说话...' : _recognizedText,
+              textAlign: TextAlign.left, // 改为左对齐以优化长文本显示
+              style: TextStyle(
+                fontSize: 16,
+                color: _recognizedText.isEmpty ? Colors.blue.shade400 : Colors.blue.shade800,
+                height: 1.4,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -548,7 +551,7 @@ class _VoiceInputDialogState extends State<VoiceInputDialog>
                 physics: const AlwaysScrollableScrollPhysics(),
                 child: Text(
                   _recognizedText,
-                  textAlign: TextAlign.center,
+                  textAlign: TextAlign.left, // 改为左对齐以优化长文本显示
                   style: TextStyle(
                     fontSize: 16,
                     color: Colors.black87,
