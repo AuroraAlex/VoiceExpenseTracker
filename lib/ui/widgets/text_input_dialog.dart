@@ -150,21 +150,26 @@ class _TextInputDialogState extends State<TextInputDialog>
                     ),
                   ],
                 ),
-                child: TextField(
-                  controller: _textController,
-                  focusNode: _focusNode,
-                  maxLines: 4,
-                  decoration: InputDecoration(
-                    border: InputBorder.none,
-                    hintText: '请输入消费信息，如"今天午餐花了35元"',
-                    hintStyle: TextStyle(color: Colors.grey[500]),
+                child: Scrollbar(
+                  child: SingleChildScrollView(
+                    child: TextField(
+                      controller: _textController,
+                      focusNode: _focusNode,
+                      maxLines: null, // 允许无限行数
+                      decoration: InputDecoration(
+                        border: InputBorder.none,
+                        hintText: '请输入消费信息，如"今天午餐花了35元"',
+                        hintStyle: TextStyle(color: Colors.grey[500]),
+                        isCollapsed: true, // 减少内部填充
+                      ),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        height: 1.4,
+                      ),
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => _confirmText(),
+                    ),
                   ),
-                  style: const TextStyle(
-                    fontSize: 16,
-                    height: 1.4,
-                  ),
-                  textInputAction: TextInputAction.done,
-                  onSubmitted: (_) => _confirmText(),
                 ),
               ),
 

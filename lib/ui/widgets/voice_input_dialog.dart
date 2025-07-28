@@ -23,6 +23,10 @@ class _VoiceInputDialogState extends State<VoiceInputDialog>
   late SherpaOnnxService _sherpaService;
   final TextEditingController _textController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
+  
+  // 添加滚动控制器，用于自动滚动
+  final ScrollController _scrollController = ScrollController();
+  final ScrollController _editScrollController = ScrollController();
 
   bool _isListening = false;
   bool _isEditing = false;
@@ -80,6 +84,8 @@ class _VoiceInputDialogState extends State<VoiceInputDialog>
     _fadeController.dispose();
     _textController.dispose();
     _focusNode.dispose();
+    _scrollController.dispose();
+    _editScrollController.dispose();
     _silenceTimer?.cancel();
     _resultSubscription?.cancel();
     _sherpaService.stopRecognition();
@@ -174,6 +180,9 @@ class _VoiceInputDialogState extends State<VoiceInputDialog>
           _recognizedText = result.isNotEmpty ? result : '未识别到内容';
         });
         
+        // 自动滚动到底部
+        _scrollToBottom();
+        
         // 重置静音计时器
         _resetSilenceTimer();
       });
@@ -190,6 +199,20 @@ class _VoiceInputDialogState extends State<VoiceInputDialog>
       _pulseController.stop();
       _pulseController.reset();
     }
+  }
+  
+  /// 滚动到底部
+  void _scrollToBottom() {
+    // 确保在下一帧渲染后滚动，以便获取正确的内容高度
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
   
   /// 重置静音计时器
@@ -224,6 +247,9 @@ class _VoiceInputDialogState extends State<VoiceInputDialog>
       }
     });
     
+    // 自动滚动到底部
+    _scrollToBottom();
+    
     // 停止动画
     _pulseController.stop();
     _pulseController.reset();
@@ -240,6 +266,13 @@ class _VoiceInputDialogState extends State<VoiceInputDialog>
     
     // 聚焦到文本框
     _focusNode.requestFocus();
+    
+    // 延迟滚动到底部，确保编辑框已经渲染完成
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (_editScrollController.hasClients) {
+        _editScrollController.jumpTo(_editScrollController.position.maxScrollExtent);
+      }
+    });
   }
 
   void _confirmText() {
@@ -369,8 +402,8 @@ class _VoiceInputDialogState extends State<VoiceInputDialog>
               return Transform.scale(
                 scale: _pulseAnimation.value,
                 child: Container(
-                  width: 80,
-                  height: 80,
+                  width: 60,
+                  height: 60,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: LinearGradient(
@@ -392,24 +425,29 @@ class _VoiceInputDialogState extends State<VoiceInputDialog>
                   child: Icon(
                     Icons.mic,
                     color: Colors.white,
-                    size: 36,
+                    size: 30,
                   ),
                 ),
               );
             },
           ),
-          const SizedBox(height: 16),
-          Text(
-            _recognizedText.isEmpty ? '请开始说话...' : _recognizedText,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 16,
-              color: _recognizedText.isEmpty ? Colors.blue.shade400 : Colors.blue.shade800,
-              height: 1.4,
-              fontWeight: FontWeight.w500,
+          const SizedBox(height: 12),
+          // 使用Expanded和SingleChildScrollView确保文本可以滚动
+          Expanded(
+            child: SingleChildScrollView(
+              controller: _scrollController,
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Text(
+                _recognizedText.isEmpty ? '请开始说话...' : _recognizedText,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: _recognizedText.isEmpty ? Colors.blue.shade400 : Colors.blue.shade800,
+                  height: 1.4,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -462,6 +500,7 @@ class _VoiceInputDialogState extends State<VoiceInputDialog>
           controller: _textController,
           focusNode: _focusNode,
           maxLines: null,
+          scrollController: _editScrollController,
           decoration: InputDecoration(
             border: InputBorder.none,
             hintText: '编辑识别的文字...',
@@ -479,7 +518,7 @@ class _VoiceInputDialogState extends State<VoiceInputDialog>
       onLongPress: _startEditing,
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
@@ -499,19 +538,26 @@ class _VoiceInputDialogState extends State<VoiceInputDialog>
             ),
           ],
         ),
+        // 使用Column包裹SingleChildScrollView，确保文本可以滚动
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              _recognizedText,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.black87,
-                height: 1.4,
+            // 使用Expanded确保文本区域占满可用空间
+            Expanded(
+              child: SingleChildScrollView(
+                controller: _scrollController,
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Text(
+                  _recognizedText,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.black87,
+                    height: 1.4,
+                  ),
+                ),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Text(
               '长按可编辑',
               style: TextStyle(
