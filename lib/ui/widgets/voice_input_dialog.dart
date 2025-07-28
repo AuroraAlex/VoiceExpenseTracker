@@ -2,7 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import '../../services/speech_service.dart';
+import '../../services/app_lifecycle_service.dart';
+import '../../services/sherpa_onnx_service.dart';
 
 class VoiceInputDialog extends StatefulWidget {
   final Function(String) onTextConfirmed;
@@ -18,13 +19,16 @@ class VoiceInputDialog extends StatefulWidget {
 
 class _VoiceInputDialogState extends State<VoiceInputDialog>
     with TickerProviderStateMixin {
-  final SpeechService _speechService = SpeechService();
+  // 使用AppLifecycleService中的共享实例
+  late SherpaOnnxService _sherpaService;
   final TextEditingController _textController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
 
   bool _isListening = false;
   bool _isEditing = false;
   String _recognizedText = '';
+  Timer? _silenceTimer;
+  StreamSubscription? _resultSubscription;
   
   late AnimationController _pulseController;
   late AnimationController _fadeController;
@@ -34,6 +38,9 @@ class _VoiceInputDialogState extends State<VoiceInputDialog>
   @override
   void initState() {
     super.initState();
+    
+    // 获取共享的SherpaOnnxService实例
+    _sherpaService = AppLifecycleService.instance.sherpaOnnxService;
     
     // 脉动动画控制器
     _pulseController = AnimationController(
@@ -73,44 +80,72 @@ class _VoiceInputDialogState extends State<VoiceInputDialog>
     _fadeController.dispose();
     _textController.dispose();
     _focusNode.dispose();
-    _speechService.stopListening();
+    _silenceTimer?.cancel();
+    _resultSubscription?.cancel();
+    _sherpaService.stopRecognition();
     super.dispose();
   }
 
 
   Future<void> _checkAndStartListening() async {
-    // 如果语音服务未初始化，先初始化
-    if (!_speechService.isInitialized) {
-      print('语音服务未初始化，开始初始化...');
-      try {
-        final success = await _speechService.initialize();
-        if (!success) {
+    // 显示准备中状态
+    setState(() {
+      _recognizedText = '';
+    });
+    
+    // 检查Sherpa服务是否已初始化
+    if (_sherpaService.isInitialized) {
+      print('Sherpa服务已初始化，直接开始语音识别');
+      _startListening();
+    } else {
+      // 显示等待初始化的提示
+      setState(() {
+        _recognizedText = '语音识别服务正在准备中，请稍候...';
+      });
+      
+      // 等待初始化完成
+      int attempts = 0;
+      const maxAttempts = 10; // 最多等待10次，每次500毫秒
+      
+      while (!_sherpaService.isInitialized && attempts < maxAttempts) {
+        print('等待Sherpa服务初始化完成，尝试次数: ${attempts + 1}');
+        await Future.delayed(const Duration(milliseconds: 500));
+        attempts++;
+      }
+      
+      if (_sherpaService.isInitialized) {
+        print('Sherpa服务已初始化完成，开始语音识别');
+        _startListening();
+      } else {
+        print('Sherpa服务初始化超时，尝试手动初始化');
+        
+        try {
+          final success = await _sherpaService.initialize();
+          if (!success) {
+            setState(() {
+              _recognizedText = 'Sherpa语音识别初始化失败，请检查麦克风权限或模型文件';
+            });
+            return;
+          }
+          print('Sherpa服务手动初始化成功');
+          _startListening();
+        } catch (e) {
+          print('Sherpa服务初始化异常: $e');
           setState(() {
-            _recognizedText = '语音识别初始化失败，请检查麦克风权限';
+            _recognizedText = 'Sherpa语音识别初始化异常: $e';
           });
-          return;
         }
-        print('语音服务初始化成功');
-      } catch (e) {
-        print('语音服务初始化异常: $e');
-        setState(() {
-          _recognizedText = '语音识别初始化异常: $e';
-        });
-        return;
       }
     }
-    
-    // 开始语音识别
-    _startListening();
   }
 
   Future<void> _startListening() async {
-    if (!_speechService.isInitialized) {
-      print('语音服务未初始化，无法开始监听');
+    if (!_sherpaService.isInitialized) {
+      print('Sherpa服务未初始化，无法开始监听');
       return;
     }
 
-    print('开始语音监听...');
+    print('开始Sherpa语音监听...');
     setState(() {
       _isListening = true;
       _isEditing = false;
@@ -121,34 +156,77 @@ class _VoiceInputDialogState extends State<VoiceInputDialog>
     _pulseController.repeat(reverse: true);
 
     try {
-      await _speechService.startListening(
-        onResult: (result) {
-          print('收到最终结果: $result');
-          setState(() {
-            _recognizedText = result.isNotEmpty ? result : '未识别到内容';
-            _isListening = false;
-          });
-          _pulseController.stop();
-          _pulseController.reset();
-        },
-        onPartialResult: (partialResult) {
-          print('收到部分结果: $partialResult');
-          if (partialResult.isNotEmpty) {
-            setState(() {
-              _recognizedText = partialResult;
-            });
-          }
-        },
-      );
+      // 取消之前的订阅
+      await _resultSubscription?.cancel();
+      
+      // 开始识别
+      final success = await _sherpaService.startRecognition();
+      if (!success) {
+        throw Exception('启动语音识别失败');
+      }
+      
+      // 订阅识别结果流
+      _resultSubscription = _sherpaService.resultStream?.listen((result) {
+        print('收到识别结果: $result');
+        
+        // 更新UI
+        setState(() {
+          _recognizedText = result.isNotEmpty ? result : '未识别到内容';
+        });
+        
+        // 重置静音计时器
+        _resetSilenceTimer();
+      });
+      
+      // 设置静音计时器，3秒无语音则停止识别
+      _resetSilenceTimer();
+      
     } catch (e) {
-      print('语音识别异常: $e');
+      print('Sherpa语音识别异常: $e');
       setState(() {
         _isListening = false;
-        _recognizedText = '语音识别失败: $e';
+        _recognizedText = 'Sherpa语音识别失败: $e';
       });
       _pulseController.stop();
       _pulseController.reset();
     }
+  }
+  
+  /// 重置静音计时器
+  void _resetSilenceTimer() {
+    _silenceTimer?.cancel();
+    _silenceTimer = Timer(const Duration(seconds: 3), () {
+      print('检测到3秒无语音，自动停止识别');
+      _stopListening();
+    });
+  }
+  
+  /// 停止语音识别
+  Future<void> _stopListening() async {
+    if (!_isListening) return;
+    
+    print('停止Sherpa语音识别');
+    
+    // 取消静音计时器
+    _silenceTimer?.cancel();
+    _silenceTimer = null;
+    
+    // 停止识别
+    final finalResult = await _sherpaService.stopRecognition();
+    
+    // 更新UI
+    setState(() {
+      _isListening = false;
+      if (finalResult.isNotEmpty) {
+        _recognizedText = finalResult;
+      } else if (_recognizedText.isEmpty) {
+        _recognizedText = '未识别到内容';
+      }
+    });
+    
+    // 停止动画
+    _pulseController.stop();
+    _pulseController.reset();
   }
 
   void _startEditing() {
