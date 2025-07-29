@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 import '../widgets/expense_list.dart';
@@ -9,6 +10,7 @@ import '../widgets/model_download_choice_dialog.dart';
 import '../../services/database_service.dart';
 import '../../services/sherpa_model_service.dart';
 import '../../models/expense.dart';
+import '../../models/time_period.dart';
 import 'add_expense_screen.dart';
 import 'settings_screen.dart';
 import 'statistics_screen.dart';
@@ -20,6 +22,7 @@ class HomeController extends GetxController {
   
   final isLoading = true.obs;
   final expenses = <Expense>[].obs;
+  final currentTimePeriod = TimePeriod.thisMonth().obs;
 
   @override
   void onInit() {
@@ -49,6 +52,39 @@ class HomeController extends GetxController {
     loadExpenses();
   }
 
+  // 更新时间周期
+  void updateTimePeriod(TimePeriod period) {
+    currentTimePeriod.value = period;
+  }
+
+  // 根据当前时间周期过滤支出列表
+  List<Expense> get filteredExpenses {
+    final period = currentTimePeriod.value;
+    return expenses
+        .where((e) => 
+            !e.date.isBefore(period.startDate) && 
+            !e.date.isAfter(period.endDate))
+        .toList();
+  }
+
+  // 根据当前时间周期计算支出
+  double get currentExpense {
+    return filteredExpenses
+        .where((e) => e.type == 'expense')
+        .fold(0.0, (sum, e) => sum + e.amount);
+  }
+
+  // 根据当前时间周期计算收入
+  double get currentIncome {
+    return filteredExpenses
+        .where((e) => e.type == 'income')
+        .fold(0.0, (sum, e) => sum + e.amount);
+  }
+
+  // 根据当前时间周期计算结余
+  double get currentBalance => currentIncome - currentExpense;
+
+  // 保持原有的月度计算方法以兼容其他地方的使用
   double get monthlyExpense {
     final now = DateTime.now();
     final firstDayOfMonth = DateTime(now.year, now.month, 1);
@@ -202,7 +238,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: RefreshIndicator(
             onRefresh: controller.loadExpenses,
             child: ExpenseList(
-              expenses: controller.expenses,
+              expenses: controller.filteredExpenses, // 使用过滤后的列表
               onDelete: (expense) async {
                 await controller.deleteExpense(expense.id!);
               },
@@ -416,32 +452,58 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildSummaryCard(HomeController controller) {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-      child: Card(
-        elevation: 4,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              // 结余信息
-              Row(
-                children: [
-                  _buildBalanceInfo('本月结余', '¥${controller.monthlyBalance.toStringAsFixed(2)}', Colors.blue, isTotal: true),
-                ],
-              ),
-              const SizedBox(height: 16),
-              // 收支信息
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildBalanceInfo('本月支出', '¥${controller.monthlyExpense.toStringAsFixed(2)}', Colors.red, icon: Icons.arrow_downward, alignRight: false),
-                  ),
-                  Expanded(
-                    child: _buildBalanceInfo('本月收入', '¥${controller.monthlyIncome.toStringAsFixed(2)}', Colors.green, icon: Icons.arrow_upward, alignRight: true),
-                  ),
-                ],
-              ),
-            ],
+      child: GestureDetector(
+        onLongPress: () {
+          HapticFeedback.mediumImpact();
+          _showTimePeriodSelector(controller);
+        },
+        child: Card(
+          elevation: 4,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                // 时间周期标题
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      controller.currentTimePeriod.value.displayName,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey,
+                      ),
+                    ),
+                    const Icon(
+                      Icons.touch_app,
+                      size: 16,
+                      color: Colors.grey,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // 结余信息
+                Row(
+                  children: [
+                    _buildBalanceInfo('结余', '¥${controller.currentBalance.toStringAsFixed(2)}', Colors.blue, isTotal: true),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                // 收支信息
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildBalanceInfo('支出', '¥${controller.currentExpense.toStringAsFixed(2)}', Colors.red, icon: Icons.arrow_downward, alignRight: false),
+                    ),
+                    Expanded(
+                      child: _buildBalanceInfo('收入', '¥${controller.currentIncome.toStringAsFixed(2)}', Colors.green, icon: Icons.arrow_upward, alignRight: true),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -515,6 +577,222 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+  }
+
+  // 显示时间周期选择器
+  void _showTimePeriodSelector(HomeController controller) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _buildTimePeriodSelector(controller),
+    );
+  }
+
+  // 构建时间周期选择器
+  Widget _buildTimePeriodSelector(HomeController controller) {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 标题栏
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.schedule, color: Colors.blue),
+                const SizedBox(width: 8),
+                const Text(
+                  '选择时间周期',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close, color: Colors.grey),
+                ),
+              ],
+            ),
+          ),
+          // 选项列表
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                // 预定义时间周期
+                ...TimePeriod.getAllPredefinedPeriods().map((period) =>
+                  _buildPeriodOption(controller, period)),
+                const SizedBox(height: 8),
+                // 自定义时间段
+                _buildCustomPeriodOption(controller),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 构建时间周期选项
+  Widget _buildPeriodOption(HomeController controller, TimePeriod period) {
+    final isSelected = controller.currentTimePeriod.value.type == period.type;
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: isSelected ? Colors.blue.shade50 : Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () {
+            controller.updateTimePeriod(period);
+            Navigator.pop(context);
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+            child: Row(
+              children: [
+                Icon(
+                  _getPeriodIcon(period.type),
+                  color: isSelected ? Colors.blue : Colors.grey.shade600,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  period.displayName,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                    color: isSelected ? Colors.blue : Colors.grey.shade800,
+                  ),
+                ),
+                const Spacer(),
+                if (isSelected)
+                  const Icon(Icons.check, color: Colors.blue),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 构建自定义时间段选项
+  Widget _buildCustomPeriodOption(HomeController controller) {
+    final isSelected = controller.currentTimePeriod.value.type == TimePeriodType.custom;
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: isSelected ? Colors.blue.shade50 : Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => _showCustomDatePicker(controller),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.date_range,
+                  color: isSelected ? Colors.blue : Colors.grey.shade600,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  isSelected ? controller.currentTimePeriod.value.displayName : '自定义时间段',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                    color: isSelected ? Colors.blue : Colors.grey.shade800,
+                  ),
+                ),
+                const Spacer(),
+                Icon(
+                  Icons.arrow_forward_ios,
+                  size: 16,
+                  color: Colors.grey.shade400,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 获取时间周期图标
+  IconData _getPeriodIcon(TimePeriodType type) {
+    switch (type) {
+      case TimePeriodType.today:
+        return Icons.today;
+      case TimePeriodType.thisWeek:
+        return Icons.view_week;
+      case TimePeriodType.thisMonth:
+        return Icons.calendar_month;
+      case TimePeriodType.thisYear:
+        return Icons.calendar_today;
+      case TimePeriodType.custom:
+        return Icons.date_range;
+    }
+  }
+
+  // 显示自定义日期选择器
+  void _showCustomDatePicker(HomeController controller) async {
+    Navigator.pop(context); // 关闭时间周期选择器
+    
+    final now = DateTime.now();
+    final startDate = await showDatePicker(
+      context: context,
+      initialDate: now,
+      firstDate: DateTime(2020),
+      lastDate: now,
+      helpText: '选择开始日期',
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+          ),
+          child: child!,
+        );
+      },
+    );
+    
+    if (startDate != null) {
+      final endDate = await showDatePicker(
+        context: context,
+        initialDate: startDate.isAfter(now) ? startDate : now,
+        firstDate: startDate,
+        lastDate: now,
+        helpText: '选择结束日期',
+        builder: (context, child) {
+          return Theme(
+            data: Theme.of(context).copyWith(
+              colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+            ),
+            child: child!,
+          );
+        },
+      );
+      
+      if (endDate != null) {
+        final customPeriod = TimePeriod.custom(startDate, endDate);
+        controller.updateTimePeriod(customPeriod);
+      }
+    }
   }
 
   Widget _buildFloatingActionButtons(HomeController controller) {

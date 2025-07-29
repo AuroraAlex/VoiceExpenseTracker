@@ -7,6 +7,7 @@ class Expense {
   final String type; // 'expense' or 'income'
   final String? description;
   final String? voiceRecord;
+  final DateTime? createdAt; // 创建时间戳（秒级精度）
 
   // 车辆相关可选字段
   final double? mileage; // 表显里程数
@@ -26,6 +27,7 @@ class Expense {
     this.type = 'expense', // Default to expense
     this.description,
     this.voiceRecord,
+    this.createdAt,
     this.mileage,
     this.mileageUpdateTime,
     this.previousMileage,
@@ -46,6 +48,9 @@ class Expense {
       type: json['type'] ?? 'expense',
       description: json['description'],
       voiceRecord: json['voiceRecord'],
+      createdAt: json['createdAt'] != null 
+          ? DateTime.parse(json['createdAt']) 
+          : null,
       mileage: json['mileage'],
       mileageUpdateTime: json['mileageUpdateTime'] != null 
           ? DateTime.parse(json['mileageUpdateTime']) 
@@ -69,6 +74,7 @@ class Expense {
       'type': type,
       'description': description,
       'voiceRecord': voiceRecord,
+      'createdAt': createdAt?.toIso8601String(),
       'mileage': mileage,
       'mileageUpdateTime': mileageUpdateTime?.toIso8601String(),
       'previousMileage': previousMileage,
@@ -90,6 +96,7 @@ class Expense {
       'type': type,
       'description': description,
       'voiceRecord': voiceRecord,
+      'createdAt': createdAt?.toIso8601String(),
       'mileage': mileage,
       'mileageUpdateTime': mileageUpdateTime?.toIso8601String(),
       'previousMileage': previousMileage,
@@ -111,6 +118,9 @@ class Expense {
       type: map['type'] ?? 'expense',
       description: map['description'],
       voiceRecord: map['voiceRecord'],
+      createdAt: map['createdAt'] != null 
+          ? DateTime.parse(map['createdAt']) 
+          : null,
       mileage: map['mileage'],
       mileageUpdateTime: map['mileageUpdateTime'] != null 
           ? DateTime.parse(map['mileageUpdateTime']) 
@@ -133,6 +143,7 @@ class Expense {
     String? type,
     String? description,
     String? voiceRecord,
+    DateTime? createdAt,
     double? mileage,
     DateTime? mileageUpdateTime,
     double? previousMileage,
@@ -150,6 +161,7 @@ class Expense {
       type: type ?? this.type,
       description: description ?? this.description,
       voiceRecord: voiceRecord ?? this.voiceRecord,
+      createdAt: createdAt ?? this.createdAt,
       mileage: mileage ?? this.mileage,
       mileageUpdateTime: mileageUpdateTime ?? this.mileageUpdateTime,
       previousMileage: previousMileage ?? this.previousMileage,

@@ -83,6 +83,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         date: _selectedDate,
         category: _selectedCategory,
         description: description,
+        createdAt: widget.expense?.createdAt ?? DateTime.now(), // 新记录使用当前时间，编辑时保持原时间
       );
 
       try {

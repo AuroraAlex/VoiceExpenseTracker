@@ -23,7 +23,7 @@ class DatabaseService {
     String path = join(await getDatabasesPath(), 'expense_tracker.db');
     return await openDatabase(
       path,
-      version: 5, // 增加版本号以触发升级
+      version: 6, // 增加版本号以触发升级
       onCreate: _createDatabase,
       onUpgrade: _upgradeDatabase,
     );
@@ -41,6 +41,7 @@ class DatabaseService {
         type TEXT DEFAULT 'expense',
         description TEXT,
         voiceRecord TEXT,
+        createdAt TEXT,
         mileage REAL,
         previousMileage REAL,
         consumption REAL,
@@ -92,6 +93,11 @@ class DatabaseService {
       // 从版本4升级到版本5：添加上一次表显里程字段
       await db.execute('ALTER TABLE expenses ADD COLUMN previousMileage REAL');
     }
+
+    if (oldVersion < 6) {
+      // 从版本5升级到版本6：添加创建时间字段
+      await db.execute('ALTER TABLE expenses ADD COLUMN createdAt TEXT');
+    }
   }
 
   // 支出相关操作
@@ -121,7 +127,10 @@ class DatabaseService {
 
   Future<List<Expense>> getExpenses() async {
     final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query('expenses');
+    final List<Map<String, dynamic>> maps = await db.query(
+      'expenses',
+      orderBy: 'createdAt DESC, date DESC, id DESC', // 优先按创建时间排序，然后按日期，最后按ID
+    );
     return List.generate(maps.length, (i) {
       return Expense.fromMap(maps[i]);
     });

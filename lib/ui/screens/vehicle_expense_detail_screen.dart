@@ -370,6 +370,7 @@ class _VehicleExpenseDetailScreenState extends State<VehicleExpenseDetailScreen>
         category: '油/电耗',
         description: '用户手动校准的油/电费用',
         expenseSubtype: '校准',
+        createdAt: DateTime.now(),
       );
       
       // 查找是否已有校准记录
@@ -563,7 +564,8 @@ class _VehicleExpenseDetailScreenState extends State<VehicleExpenseDetailScreen>
                     category: '汽车',
                     mileage: value,
                     previousMileage: previousMileage,
-                    mileageUpdateTime: DateTime.now()
+                    mileageUpdateTime: DateTime.now(),
+                    createdAt: DateTime.now(),
                   );
                   await _databaseService.insertExpense(newExpense);
                   
@@ -579,7 +581,8 @@ class _VehicleExpenseDetailScreenState extends State<VehicleExpenseDetailScreen>
                     category: '汽车',
                     mileage: value,
                     previousMileage: previousMileage,
-                    mileageUpdateTime: DateTime.now()
+                    mileageUpdateTime: DateTime.now(),
+                    createdAt: DateTime.now(),
                   );
                   await _databaseService.insertExpense(newExpense);
                 }
@@ -593,7 +596,8 @@ class _VehicleExpenseDetailScreenState extends State<VehicleExpenseDetailScreen>
                   category: '汽车',
                   mileage: value,
                   previousMileage: 0, // 第一次记录，上一次里程为0
-                  mileageUpdateTime: DateTime.now()
+                  mileageUpdateTime: DateTime.now(),
+                  createdAt: DateTime.now(),
                 );
                 await _databaseService.insertExpense(newExpense);
               }

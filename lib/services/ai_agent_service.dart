@@ -126,6 +126,7 @@ class AIAgentService {
         category: data['category'] ?? '其他',
         description: data['description'],
         voiceRecord: originalVoiceText,
+        createdAt: DateTime.now(), // 添加创建时间戳
         mileage: data['mileage'] is num ? data['mileage'].toDouble() : double.tryParse(data['mileage']?.toString() ?? '0'),
         consumption: data['consumption'] is num ? data['consumption'].toDouble() : double.tryParse(data['consumption']?.toString() ?? '0'),
         vehicleType: data['vehicleType'],
