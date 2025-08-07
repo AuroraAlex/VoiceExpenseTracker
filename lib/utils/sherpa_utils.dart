@@ -317,58 +317,120 @@ Future<String?> getSystemDownloadModelFilePath(String modelName) async {
     
     print('在应用下载目录未找到模型文件，尝试从系统下载目录复制');
     
-    // 直接请求存储权限（会弹出系统权限授权窗口）
-    final storageStatus = await Permission.storage.status;
-    if (!storageStatus.isGranted) {
-      print('请求基本存储权限...');
-      final result = await Permission.storage.request();
-      if (!result.isGranted) {
-        print('基本存储权限被拒绝');
+    // 根据平台不同处理
+    if (Platform.isAndroid) {
+      // Android 平台处理
+      // 直接请求存储权限（会弹出系统权限授权窗口）
+      final storageStatus = await Permission.storage.status;
+      if (!storageStatus.isGranted) {
+        print('请求基本存储权限...');
+        final result = await Permission.storage.request();
+        if (!result.isGranted) {
+          print('基本存储权限被拒绝');
+          return null;
+        }
+        print('基本存储权限已授予');
+      } else {
+        print('基本存储权限已授予');
+      }
+      
+      // 直接请求管理外部存储权限（Android 11+）
+      print('请求管理外部存储权限...');
+      final externalResult = await Permission.manageExternalStorage.request();
+      if (!externalResult.isGranted) {
+        print('管理外部存储权限被拒绝，使用基本权限');
+      }
+      
+      // 尝试从系统下载目录获取文件
+      final Directory? downloadDir = await getExternalStorageDirectory();
+      if (downloadDir == null) {
+        print('无法获取外部存储目录');
         return null;
       }
-      print('基本存储权限已授予');
-    } else {
-      print('基本存储权限已授予');
-    }
-    
-    // 直接请求管理外部存储权限（Android 11+）
-    print('请求管理外部存储权限...');
-    final externalResult = await Permission.manageExternalStorage.request();
-    if (!externalResult.isGranted) {
-      print('管理外部存储权限被拒绝，使用基本权限');
-    }
-    
-    // 尝试从系统下载目录获取文件
-    final Directory? downloadDir = await getExternalStorageDirectory();
-    if (downloadDir == null) {
-      print('无法获取外部存储目录');
-      return null;
-    }
-    
-    // 构建系统下载目录路径
-    // 通常外部存储目录是 /storage/emulated/0/Android/data/com.example.app/files
-    // 我们需要获取到 /storage/emulated/0/Download
-    final String systemDownloadPath = downloadDir.path.split('/Android')[0] + '/Download';
-    final String systemFilePath = join(systemDownloadPath, '$modelName.tar.bz2');
-    final File systemFile = File(systemFilePath);
-    
-    if (await systemFile.exists()) {
-      print('在系统下载目录找到模型文件: $systemFilePath');
       
-      // 复制到应用内部目录
+      // 构建系统下载目录路径
+      // 通常外部存储目录是 /storage/emulated/0/Android/data/com.example.app/files
+      // 我们需要获取到 /storage/emulated/0/Download
+      final String systemDownloadPath = downloadDir.path.split('/Android')[0] + '/Download';
+      final String systemFilePath = join(systemDownloadPath, '$modelName.tar.bz2');
+      final File systemFile = File(systemFilePath);
+      
+      if (await systemFile.exists()) {
+        print('在系统下载目录找到模型文件: $systemFilePath');
+        
+        // 复制到应用内部目录
+        try {
+          await systemFile.copy(appFilePath);
+          print('已将模型文件从系统下载目录复制到应用内部目录');
+          return appFilePath;
+        } catch (e) {
+          print('复制文件失败: $e');
+          // 如果复制失败，仍然返回系统路径，让调用者决定如何处理
+          return systemFilePath;
+        }
+      }
+      
+      print('在系统下载目录未找到模型文件');
+      return null;
+    } 
+    else if (Platform.isIOS) {
+      // iOS 平台处理
+      print('iOS平台：尝试从iOS下载目录查找模型文件');
+      
       try {
-        await systemFile.copy(appFilePath);
-        print('已将模型文件从系统下载目录复制到应用内部目录');
-        return appFilePath;
+        // iOS 没有统一的下载目录，但可以尝试常见位置
+        // 首先尝试Documents目录
+        final Directory documentsDir = await getApplicationDocumentsDirectory();
+        final String documentsFilePath = join(documentsDir.path, '$modelName.tar.bz2');
+        final File documentsFile = File(documentsFilePath);
+        
+        if (await documentsFile.exists()) {
+          print('在iOS Documents目录找到模型文件: $documentsFilePath');
+          
+          // 如果文件不在应用下载目录，复制过去
+          if (documentsFilePath != appFilePath) {
+            try {
+              await documentsFile.copy(appFilePath);
+              print('已将模型文件从Documents目录复制到应用下载目录');
+              return appFilePath;
+            } catch (e) {
+              print('复制文件失败: $e');
+              return documentsFilePath;
+            }
+          }
+          return documentsFilePath;
+        }
+        
+        // 尝试Library/Caches目录
+        final Directory tempDir = await getTemporaryDirectory();
+        final String tempFilePath = join(tempDir.path, '$modelName.tar.bz2');
+        final File tempFile = File(tempFilePath);
+        
+        if (await tempFile.exists()) {
+          print('在iOS临时目录找到模型文件: $tempFilePath');
+          
+          try {
+            await tempFile.copy(appFilePath);
+            print('已将模型文件从临时目录复制到应用下载目录');
+            return appFilePath;
+          } catch (e) {
+            print('复制文件失败: $e');
+            return tempFilePath;
+          }
+        }
+        
+        print('在iOS常见目录中未找到模型文件');
+        return null;
       } catch (e) {
-        print('复制文件失败: $e');
-        // 如果复制失败，仍然返回系统路径，让调用者决定如何处理
-        return systemFilePath;
+        print('iOS平台查找模型文件时出错: $e');
+        return null;
       }
     }
-    
-    print('在系统下载目录未找到模型文件');
-    return null;
+    else {
+      // 其他平台
+      print('不支持的平台: ${Platform.operatingSystem}');
+      return null;
+    }
   } catch (e) {
     print('获取模型文件路径时出错: $e');
     return null;

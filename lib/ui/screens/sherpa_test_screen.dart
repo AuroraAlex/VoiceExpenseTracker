@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:voice_expense_tracker/services/app_lifecycle_service.dart';
 import 'package:voice_expense_tracker/services/sherpa_model_service.dart';
 import 'package:voice_expense_tracker/services/sherpa_onnx_service.dart';
+import 'package:voice_expense_tracker/services/speech_recognition_service.dart';
 import 'package:voice_expense_tracker/ui/widgets/audio_waveform.dart';
 import 'package:voice_expense_tracker/ui/widgets/download_progress_dialog.dart';
 import 'package:voice_expense_tracker/ui/widgets/sherpa_settings_dialog.dart';
@@ -22,6 +23,7 @@ class _SherpaTestScreenState extends State<SherpaTestScreen> {
   late SherpaOnnxService _sherpaService;
   final TextEditingController _resultController = TextEditingController();
   
+  bool _isSherpaServiceAvailable = false;
   bool _isInitialized = false;
   bool _isRecording = false;
   bool _isCopyingModel = false;
@@ -34,9 +36,14 @@ class _SherpaTestScreenState extends State<SherpaTestScreen> {
   @override
   void initState() {
     super.initState();
-    // 获取共享的SherpaOnnxService实例
-    _sherpaService = AppLifecycleService.instance.sherpaOnnxService;
-    _checkInitialization();
+    final SpeechRecognitionService speechService = AppLifecycleService.instance.speechRecognitionService;
+    if (speechService is SherpaOnnxService) {
+      setState(() {
+        _isSherpaServiceAvailable = true;
+        _sherpaService = speechService;
+        _checkInitialization();
+      });
+    }
   }
   
   // 检查初始化状态
@@ -372,6 +379,23 @@ class _SherpaTestScreenState extends State<SherpaTestScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_isSherpaServiceAvailable) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Sherpa-ONNX Test'),
+        ),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text(
+              'This test screen is only available for the Sherpa-ONNX service, which is not active on this platform (iOS).',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+          ),
+        ),
+      );
+    }
     return Scaffold(
       appBar: AppBar(
         title: const Text('Sherpa-ONNX语音识别测试'),

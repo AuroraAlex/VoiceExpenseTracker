@@ -53,5 +53,7 @@
 	<string>需要访问您的文档文件夹以存储语音识别模型。</string>
 	<key>NSDownloadsFolderUsageDescription</key>
 	<string>需要访问您的下载文件夹以导入语音识别模型。</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>我们需要使用语音识别功能，将您的语音转换为文字进行记账。</string>
 </dict>
 </plist>

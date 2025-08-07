@@ -9,11 +9,12 @@ import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa_onnx;
 import 'package:voice_expense_tracker/utils/sherpa_utils.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
+import 'speech_recognition_service.dart';
 
 /// Sherpa-ONNX语音识别服务
 /// 
-/// 提供基于Sherpa-ONNX的流式语音识别功能，仅支持安卓平台
-class SherpaOnnxService {
+/// 提供基于Sherpa-ONNX的流式语音识别功能，支持Android和iOS平台
+class SherpaOnnxService implements SpeechRecognitionService {
   static final SherpaOnnxService _instance = SherpaOnnxService._internal();
   factory SherpaOnnxService() => _instance;
   SherpaOnnxService._internal();
@@ -34,12 +35,14 @@ class SherpaOnnxService {
   int _index = 0;
 
   /// 当前识别器是否已初始化
+  @override
   bool get isInitialized => _isInitialized;
   
   /// 当前是否正在录音识别
   bool get isRecording => _isRecording;
   
   /// 识别结果流，可以订阅此流来获取实时识别结果
+  @override
   Stream<String>? get resultStream => _resultStreamController?.stream;
 
   // 模型配置预加载
@@ -96,6 +99,7 @@ class SherpaOnnxService {
   /// 
   /// 在使用其他功能前必须先调用此方法
   /// 返回初始化是否成功
+  @override
   Future<bool> initialize() async {
     if (_isInitialized) {
       print('Sherpa-ONNX识别器已经初始化，跳过重复初始化');
@@ -120,51 +124,145 @@ class SherpaOnnxService {
         }
       }
 
-      // 如果模型配置未预加载，则等待预加载完成或直接加载
-      if (_preloadedModelConfig == null && !_isPreloading) {
-        print('模型配置未预加载，开始加载模型配置');
-        await preloadModel();
-      } else if (_isPreloading) {
-        print('模型配置正在预加载中，等待完成...');
-        await _preloadCompleter?.future;
-      }
-      
-      // 如果预加载失败，再次检查模型是否存在
-      if (_preloadedModelConfig == null) {
-        print('模型配置预加载失败，重新检查模型文件');
+      // 根据平台不同进行特定处理
+      if (Platform.isIOS) {
+        print('iOS平台：使用特定的初始化流程');
         
-        // 检查模型是否需要下载
-        final needsDownloadVal = await needsDownload(_modelName);
-        final needsUnZipVal = await needsUnZip(_modelName);
-        
-        if (needsDownloadVal || needsUnZipVal) {
-          print('模型文件不存在，需要先下载或解压模型');
+        // iOS平台可能需要更多的错误处理和重试机制
+        try {
+          // 如果模型配置未预加载，则等待预加载完成或直接加载
+          if (_preloadedModelConfig == null && !_isPreloading) {
+            print('iOS平台：模型配置未预加载，开始加载模型配置');
+            
+            // 在iOS上使用更长的超时时间
+            bool preloadSuccess = false;
+            int retryCount = 0;
+            
+            while (retryCount < 3 && !preloadSuccess) {
+              try {
+                preloadSuccess = await preloadModel();
+                if (!preloadSuccess) {
+                  print('iOS平台：预加载尝试 ${retryCount + 1} 失败，将重试');
+                  retryCount++;
+                  await Future.delayed(Duration(seconds: 1));
+                }
+              } catch (e) {
+                print('iOS平台：预加载尝试 ${retryCount + 1} 异常: $e');
+                retryCount++;
+                await Future.delayed(Duration(seconds: 1));
+              }
+            }
+            
+            if (!preloadSuccess) {
+              print('iOS平台：模型预加载失败，达到最大重试次数');
+              return false;
+            }
+          } else if (_isPreloading) {
+            print('iOS平台：模型配置正在预加载中，等待完成...');
+            try {
+              await _preloadCompleter?.future.timeout(
+                Duration(seconds: 10),
+                onTimeout: () {
+                  throw TimeoutException('iOS平台：等待预加载超时');
+                }
+              );
+            } catch (e) {
+              print('iOS平台：等待预加载完成时出错: $e');
+              // 如果等待超时，尝试重新预加载
+              _isPreloading = false;
+              await preloadModel();
+            }
+          }
+          
+          // 如果预加载失败，再次检查模型是否存在
+          if (_preloadedModelConfig == null) {
+            print('iOS平台：模型配置预加载失败，重新检查模型文件');
+            
+            // 检查模型是否需要下载
+            final needsDownloadVal = await needsDownload(_modelName);
+            final needsUnZipVal = await needsUnZip(_modelName);
+            
+            if (needsDownloadVal || needsUnZipVal) {
+              print('iOS平台：模型文件不存在，需要先下载或解压模型');
+              return false;
+            }
+            
+            // 加载模型配置
+            _preloadedModelConfig = await getModelConfigByModelName(modelName: _modelName);
+          }
+          
+          // 创建识别器
+          print('iOS平台：正在创建语音识别器...');
+          final config = sherpa_onnx.OnlineRecognizerConfig(
+            model: _preloadedModelConfig!,
+            ruleFsts: '',
+          );
+          
+          _recognizer = sherpa_onnx.OnlineRecognizer(config);
+          print('iOS平台：语音识别器创建成功');
+          
+          // 初始化录音器
+          print('iOS平台：正在初始化录音器...');
+          await _recorder.openRecorder();
+          await _recorder.setSubscriptionDuration(const Duration(milliseconds: 200));
+          print('iOS平台：录音器初始化成功');
+          
+          _isInitialized = true;
+          print('iOS平台：Sherpa-ONNX识别器初始化完成！');
+          return true;
+        } catch (e) {
+          print('iOS平台：Sherpa-ONNX识别器初始化异常: $e');
+          _isInitialized = false;
           return false;
         }
+      } else {
+        // Android平台正常流程
+        // 如果模型配置未预加载，则等待预加载完成或直接加载
+        if (_preloadedModelConfig == null && !_isPreloading) {
+          print('模型配置未预加载，开始加载模型配置');
+          await preloadModel();
+        } else if (_isPreloading) {
+          print('模型配置正在预加载中，等待完成...');
+          await _preloadCompleter?.future;
+        }
         
-        // 加载模型配置
-        _preloadedModelConfig = await getModelConfigByModelName(modelName: _modelName);
+        // 如果预加载失败，再次检查模型是否存在
+        if (_preloadedModelConfig == null) {
+          print('模型配置预加载失败，重新检查模型文件');
+          
+          // 检查模型是否需要下载
+          final needsDownloadVal = await needsDownload(_modelName);
+          final needsUnZipVal = await needsUnZip(_modelName);
+          
+          if (needsDownloadVal || needsUnZipVal) {
+            print('模型文件不存在，需要先下载或解压模型');
+            return false;
+          }
+          
+          // 加载模型配置
+          _preloadedModelConfig = await getModelConfigByModelName(modelName: _modelName);
+        }
+        
+        // 创建识别器
+        print('正在创建语音识别器...');
+        final config = sherpa_onnx.OnlineRecognizerConfig(
+          model: _preloadedModelConfig!,
+          ruleFsts: '',
+        );
+        
+        _recognizer = sherpa_onnx.OnlineRecognizer(config);
+        print('语音识别器创建成功');
+        
+        // 初始化录音器
+        print('正在初始化录音器...');
+        await _recorder.openRecorder();
+        await _recorder.setSubscriptionDuration(const Duration(milliseconds: 200));
+        print('录音器初始化成功');
+        
+        _isInitialized = true;
+        print('Sherpa-ONNX识别器初始化完成！');
+        return true;
       }
-      
-      // 创建识别器
-      print('正在创建语音识别器...');
-      final config = sherpa_onnx.OnlineRecognizerConfig(
-        model: _preloadedModelConfig!,
-        ruleFsts: '',
-      );
-      
-      _recognizer = sherpa_onnx.OnlineRecognizer(config);
-      print('语音识别器创建成功');
-      
-      // 初始化录音器
-      print('正在初始化录音器...');
-      await _recorder.openRecorder();
-      await _recorder.setSubscriptionDuration(const Duration(milliseconds: 200));
-      print('录音器初始化成功');
-      
-      _isInitialized = true;
-      print('Sherpa-ONNX识别器初始化完成！');
-      return true;
     } catch (e) {
       print('Sherpa-ONNX识别器初始化异常: $e');
       _isInitialized = false;
@@ -176,6 +274,7 @@ class SherpaOnnxService {
   /// 
   /// 开始录音并进行实时语音识别
   /// 识别结果会通过[resultStream]流返回
+  @override
   Future<bool> startRecognition() async {
     if (!_isInitialized) {
       print('语音识别器未初始化，无法开始识别');
@@ -203,10 +302,19 @@ class SherpaOnnxService {
         
         // 用于累积音频数据的缓冲区
         List<int> _audioBuffer = [];
-        int _bufferSize = 3200; // 累积0.2秒的数据 (16000Hz * 0.2s * 2bytes)
+        int _bufferSize = Platform.isIOS ? 1600 : 3200; // iOS平台使用更小的缓冲区，提高响应速度
         
         _recordingDataSubscription = _audioDataController!.stream.listen((audioData) {
-          print('收到音频数据: ${audioData.length} 字节');
+          // iOS平台可能需要更详细的日志来调试
+          if (Platform.isIOS) {
+            // 减少日志输出，只在调试时打印
+            if (_index % 20 == 0) { // 每20帧打印一次日志
+              print('iOS平台：收到音频数据: ${audioData.length} 字节');
+            }
+            _index++;
+          } else {
+            print('收到音频数据: ${audioData.length} 字节');
+          }
           
           // 将新数据添加到缓冲区
           _audioBuffer.addAll(audioData);
@@ -217,47 +325,136 @@ class SherpaOnnxService {
             final dataToProcess = _audioBuffer.take(_bufferSize).toList();
             _audioBuffer = _audioBuffer.skip(_bufferSize).toList();
             
-            print('处理音频数据: ${dataToProcess.length} 字节');
-            
-            final samplesFloat32 = convertBytesToFloat32(Uint8List.fromList(dataToProcess));
-            print('转换后的Float32数据长度: ${samplesFloat32.length}');
-            
-            if (_stream != null && _recognizer != null) {
-              _stream!.acceptWaveform(samples: samplesFloat32, sampleRate: _sampleRate);
-              print('音频数据已传递给识别器');
+            try {
+              final samplesFloat32 = convertBytesToFloat32(Uint8List.fromList(dataToProcess));
               
-              while (_recognizer!.isReady(_stream!)) {
-                _recognizer!.decode(_stream!);
-                print('正在解码...');
-              }
-              
-              final text = _recognizer!.getResult(_stream!).text;
-              print('当前识别结果: "$text"');
-              
-              if (text.isNotEmpty && text != _last) {
-                _last = text;
-                print('识别到新文本: $text');
-                _resultStreamController?.add(text);
-              }
+              if (_stream != null && _recognizer != null) {
+                try {
+                  _stream!.acceptWaveform(samples: samplesFloat32, sampleRate: _sampleRate);
+                  
+                  while (_recognizer!.isReady(_stream!)) {
+                    _recognizer!.decode(_stream!);
+                  }
+                  
+                  final text = _recognizer!.getResult(_stream!).text;
+                  
+                  if (text.isNotEmpty && text != _last) {
+                    _last = text;
+                    
+                    if (Platform.isIOS) {
+                      print('iOS平台：识别到新文本: $text');
+                    } else {
+                      print('识别到新文本: $text');
+                    }
+                    
+                    _resultStreamController?.add(text);
+                  }
 
-              if (_recognizer!.isEndpoint(_stream!)) {
-                print('检测到语音终点，重置识别器');
-                _recognizer!.reset(_stream!);
-                _last = '';
+                  if (_recognizer!.isEndpoint(_stream!)) {
+                    if (Platform.isIOS) {
+                      print('iOS平台：检测到语音终点，重置识别器');
+                    } else {
+                      print('检测到语音终点，重置识别器');
+                    }
+                    
+                    _recognizer!.reset(_stream!);
+                    _last = '';
+                  }
+                } catch (e) {
+                  // 在iOS上，我们不希望单个错误导致整个识别过程失败
+                  // 所以这里捕获异常但继续处理
+                  if (Platform.isIOS) {
+                    // 减少日志输出，避免刷屏
+                    if (_index % 50 == 0) {
+                      print('iOS平台：处理音频数据时出错: $e');
+                    }
+                  } else {
+                    print('处理音频数据时出错: $e');
+                  }
+                }
               }
+            } catch (e) {
+              if (Platform.isIOS) {
+                // 减少日志输出，避免刷屏
+                if (_index % 50 == 0) {
+                  print('iOS平台：转换音频数据时出错: $e');
+                }
+              } else {
+                print('转换音频数据时出错: $e');
+              }
+              // 继续处理，不中断识别流程
             }
           }
         });
 
-        await _recorder.startRecorder(
-          toStream: _audioDataController!.sink,
-          codec: Codec.pcm16,
-          numChannels: 1,
-          sampleRate: _sampleRate,
-        );
+        try {
+          // iOS平台特殊处理
+          if (Platform.isIOS) {
+            print('iOS平台：开始录音...');
+            
+            // 在iOS上，使用更保守的设置并添加错误处理
+            try {
+              await _recorder.startRecorder(
+                toStream: _audioDataController!.sink,
+                codec: Codec.pcm16,
+                numChannels: 1,
+                sampleRate: _sampleRate,
+              );
+              
+              // 检查录音是否真的开始了
+              if (!_recorder.isRecording) {
+                print('iOS平台：录音器状态检查失败，尝试重新启动...');
+                await Future.delayed(Duration(milliseconds: 500));
+                await _recorder.startRecorder(
+                  toStream: _audioDataController!.sink,
+                  codec: Codec.pcm16,
+                  numChannels: 1,
+                  sampleRate: _sampleRate,
+                );
+              }
+              
+              print('iOS平台：录音已开始: ${_recorder.isRecording}');
+            } catch (e) {
+              print('iOS平台：启动录音失败，尝试重新初始化录音器: $e');
+              
+              // 尝试重新初始化录音器
+              await _recorder.closeRecorder();
+              await Future.delayed(Duration(milliseconds: 500));
+              await _recorder.openRecorder();
+              await _recorder.setSubscriptionDuration(const Duration(milliseconds: 100)); // iOS使用更短的订阅时间
+              
+              // 再次尝试启动录音
+              await _recorder.startRecorder(
+                toStream: _audioDataController!.sink,
+                codec: Codec.pcm16,
+                numChannels: 1,
+                sampleRate: _sampleRate,
+              );
+              
+              print('iOS平台：录音重新初始化后已开始: ${_recorder.isRecording}');
+            }
+          } else {
+            await _recorder.startRecorder(
+              toStream: _audioDataController!.sink,
+              codec: Codec.pcm16,
+              numChannels: 1,
+              sampleRate: _sampleRate,
+            );
+          }
 
-        _isRecording = true;
-        print('语音识别启动成功: ${_recorder.isRecording}');
+          _isRecording = true;
+          print('语音识别启动成功: ${_recorder.isRecording}');
+        } catch (e) {
+          print('启动录音失败: $e');
+          
+          // 清理资源
+          await _recordingDataSubscription?.cancel();
+          _recordingDataSubscription = null;
+          await _audioDataController?.close();
+          _audioDataController = null;
+          
+          throw e; // 重新抛出异常
+        }
       }
       
       return true;
@@ -274,6 +471,7 @@ class SherpaOnnxService {
   /// 
   /// 停止录音并获取最终识别结果
   /// 返回最终识别结果文本
+  @override
   Future<String> stopRecognition() async {
     if (!_isRecording) return '';
 
@@ -282,12 +480,13 @@ class SherpaOnnxService {
       
       // 取消处理定时器
       // 停止录音
-      await _recorder.stopRecorder();
-      print('录音已停止');
-
-      // 停止录音
-      await _recorder.stopRecorder();
-      print('录音已停止');
+      try {
+        await _recorder.stopRecorder();
+        print('录音已停止');
+      } catch (e) {
+        print('停止录音时出错: $e');
+        // 继续执行，不要因为停止录音失败而中断整个流程
+      }
 
       // 取消音频流订阅
       await _recordingDataSubscription?.cancel();
@@ -298,18 +497,28 @@ class SherpaOnnxService {
       // 获取最终识别结果
       String finalResult = '';
       if (_stream != null && _recognizer != null) {
-        // 确保所有数据都被处理
-        while (_recognizer!.isReady(_stream!)) {
-          _recognizer!.decode(_stream!);
+        try {
+          // 确保所有数据都被处理
+          while (_recognizer!.isReady(_stream!)) {
+            _recognizer!.decode(_stream!);
+          }
+          
+          finalResult = _recognizer!.getResult(_stream!).text;
+          print('识别结果流结束');
+          print('语音识别最终结果: $finalResult');
+        } catch (e) {
+          print('获取最终识别结果时出错: $e');
+          // 如果获取结果失败，使用最后一次成功的结果
+          finalResult = _last;
+        } finally {
+          // 释放流
+          try {
+            _stream!.free();
+          } catch (e) {
+            print('释放流时出错: $e');
+          }
+          _stream = null;
         }
-        
-        finalResult = _recognizer!.getResult(_stream!).text;
-        print('识别结果流结束');
-        print('语音识别最终结果: $finalResult');
-        
-        // 释放流
-        _stream!.free();
-        _stream = null;
       }
       
       // 添加最终结果到流中
@@ -322,6 +531,7 @@ class SherpaOnnxService {
       _resultStreamController = null;
       
       _isRecording = false;
+      _index = 0; // 重置索引计数器
       return finalResult;
     } catch (e) {
       print('停止语音识别失败: $e');
@@ -332,6 +542,7 @@ class SherpaOnnxService {
       await _resultStreamController?.close();
       _resultStreamController = null;
       _isRecording = false;
+      _index = 0; // 重置索引计数器
       return '';
     }
   }
@@ -426,6 +637,7 @@ class SherpaOnnxService {
   }
 
   /// 销毁识别器，释放资源
+  @override
   Future<void> dispose() async {
     try {
       if (_isRecording) {
