@@ -54,3 +54,4 @@ android/app/sherpa-onnx-libs/
 # 模型文件不打包进应用，用户需要在线下载
 assets/models/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/
 assets/models/sherpa-onnx-streaming-zipformer-small-ctc-zh-2025-04-01/
+assets/models/
