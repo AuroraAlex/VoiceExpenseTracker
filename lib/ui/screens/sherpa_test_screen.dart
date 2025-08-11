@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:voice_expense_tracker/services/app_lifecycle_service.dart';
-import 'package:voice_expense_tracker/services/sherpa_model_service.dart';
+import 'package:voice_expense_tracker/services/speech_recognition_factory.dart';
 import 'package:voice_expense_tracker/services/sherpa_onnx_service.dart';
 import 'package:voice_expense_tracker/services/speech_recognition_service.dart';
 import 'package:voice_expense_tracker/ui/widgets/audio_waveform.dart';
@@ -19,8 +18,8 @@ class SherpaTestScreen extends StatefulWidget {
 }
 
 class _SherpaTestScreenState extends State<SherpaTestScreen> {
-  // 使用AppLifecycleService中的共享实例
-  late SherpaOnnxService _sherpaService;
+  // 使用语音识别服务
+  late SpeechRecognitionService _speechService;
   final TextEditingController _resultController = TextEditingController();
   
   bool _isSherpaServiceAvailable = false;
@@ -36,66 +35,45 @@ class _SherpaTestScreenState extends State<SherpaTestScreen> {
   @override
   void initState() {
     super.initState();
-    final SpeechRecognitionService speechService = AppLifecycleService.instance.speechRecognitionService;
-    if (speechService is SherpaOnnxService) {
-      setState(() {
-        _isSherpaServiceAvailable = true;
-        _sherpaService = speechService;
-        _checkInitialization();
-      });
-    }
+    _speechService = SpeechRecognitionFactory.getInstance();
+    setState(() {
+      _isSherpaServiceAvailable = true;
+    });
+    _checkInitialization();
   }
   
   // 检查初始化状态
   Future<void> _checkInitialization() async {
-    if (_sherpaService.isInitialized) {
-      print('Sherpa-ONNX服务已初始化，无需重新初始化');
+    if (_speechService.isInitialized) {
+      print('语音识别服务已初始化，无需重新初始化');
       setState(() {
         _isInitialized = true;
         _statusText = '就绪';
         _errorMessage = '';
       });
     } else {
-      await _initializeSherpa();
+      await _initializeSpeechService();
     }
   }
 
-  Future<void> _initializeSherpa() async {
+  Future<void> _initializeSpeechService() async {
     try {
-      print('开始初始化Sherpa-ONNX识别器');
+      print('开始初始化语音识别服务');
       setState(() {
         _statusText = '正在初始化...';
         _errorMessage = '';
       });
       
-      // 获取模型服务
-      final modelService = Provider.of<SherpaModelService>(context, listen: false);
+      final success = await _speechService.initialize();
       
-      // 检查模型是否已准备好
-      final isModelReady = await modelService.checkModelReady();
-      
-      if (!isModelReady) {
-        // 准备模型
-        final success = await modelService.prepareModel();
-        if (!success) {
-          setState(() {
-            _statusText = '模型准备失败';
-            _errorMessage = modelService.errorMessage;
-          });
-          return;
-        }
-      }
-      
-      final success = await _sherpaService.initialize();
-      
-      print('Sherpa-ONNX识别器初始化结果: $success');
+      print('语音识别服务初始化结果: $success');
       setState(() {
         _isInitialized = success;
         _statusText = success ? '就绪' : '初始化失败';
-        _errorMessage = success ? '' : '无法初始化Sherpa-ONNX识别器';
+        _errorMessage = success ? '' : '无法初始化语音识别服务';
       });
     } catch (e) {
-      print('Sherpa-ONNX识别器初始化异常: $e');
+      print('语音识别服务初始化异常: $e');
       setState(() {
         _isInitialized = false;
         _statusText = '初始化错误';
@@ -106,25 +84,7 @@ class _SherpaTestScreenState extends State<SherpaTestScreen> {
 
   Future<void> _toggleRecording() async {
     if (!_isInitialized) {
-      // 获取模型服务
-      final modelService = Provider.of<SherpaModelService>(context, listen: false);
-      
-      // 检查模型是否已准备好
-      final isModelReady = await modelService.checkModelReady();
-      
-      if (!isModelReady) {
-        // 准备模型
-        final success = await modelService.prepareModel();
-        if (!success) {
-          setState(() {
-            _statusText = '模型准备失败';
-            _errorMessage = modelService.errorMessage;
-          });
-          return;
-        }
-      }
-      
-      await _initializeSherpa();
+      await _initializeSpeechService();
       if (!_isInitialized) return;
     }
 
@@ -147,9 +107,7 @@ class _SherpaTestScreenState extends State<SherpaTestScreen> {
       print('应用设置: 模型=${_settings.modelName}, 语言=${_settings.language}, '
             '灵敏度=${_settings.sensitivity}, 自动停止=${_settings.autoStop}');
       
-      // 在实际应用中，这里需要将设置传递给语音识别服务
-      
-      final success = await _sherpaService.startRecognition();
+      final success = await _speechService.startRecognition();
       print('语音识别启动结果: $success');
       
       if (success) {
@@ -159,7 +117,7 @@ class _SherpaTestScreenState extends State<SherpaTestScreen> {
         });
         
         // 监听识别结果
-        _sherpaService.resultStream?.listen(
+        _speechService.resultStream?.listen(
           (result) {
             print('收到识别结果: $result');
             setState(() {
@@ -199,7 +157,7 @@ class _SherpaTestScreenState extends State<SherpaTestScreen> {
         _statusText = '正在处理...';
       });
       
-      final result = await _sherpaService.stopRecognition();
+      final result = await _speechService.stopRecognition();
       print('语音识别最终结果: $result');
       
       setState(() {
@@ -247,7 +205,7 @@ class _SherpaTestScreenState extends State<SherpaTestScreen> {
         );
         
         // 重新初始化
-        await _initializeSherpa();
+        await _initializeSpeechService();
       } else {
         setState(() {
           _statusText = '模型文件复制失败';
@@ -278,7 +236,7 @@ class _SherpaTestScreenState extends State<SherpaTestScreen> {
   // 测试音频文件识别
   Future<void> _testAudioFile() async {
     if (!_isInitialized) {
-      await _initializeSherpa();
+      await _initializeSpeechService();
       if (!_isInitialized) return;
     }
 
@@ -289,22 +247,16 @@ class _SherpaTestScreenState extends State<SherpaTestScreen> {
       });
 
       print('开始测试音频文件识别');
-      final result = await _sherpaService.testAudioFileRecognition('0.wav');
       
+      // 对于通用的语音识别服务，我们只能显示一个提示
       setState(() {
         _statusText = '测试完成';
-        _resultController.text = result.isNotEmpty ? result : '未识别到内容';
+        _resultController.text = '音频文件测试功能仅在Sherpa-ONNX服务中可用';
       });
 
-      if (result.isNotEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('测试成功，识别结果: $result')),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('测试完成，但未识别到内容')),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('音频文件测试功能仅在Sherpa-ONNX服务中可用')),
+      );
     } catch (e) {
       print('测试音频文件识别失败: $e');
       setState(() {

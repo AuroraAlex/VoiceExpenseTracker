@@ -1,14 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:provider/provider.dart';
 import '../widgets/expense_list.dart';
 import '../widgets/voice_input_button.dart';
 import '../widgets/text_input_button.dart';
-import '../widgets/manual_model_dialog.dart';
-import '../widgets/model_download_choice_dialog.dart';
 import '../../services/database_service.dart';
-import '../../services/sherpa_model_service.dart';
 import '../../models/expense.dart';
 import '../../models/time_period.dart';
 import 'add_expense_screen.dart';
@@ -123,42 +119,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  bool _hasCheckedModel = false;
-
-  @override
-  void initState() {
-    super.initState();
-    // 延迟检查模型状态，确保界面完全加载后再弹出对话框
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkModelStatus();
-    });
-  }
-
-  Future<void> _checkModelStatus() async {
-    if (_hasCheckedModel) return;
-    _hasCheckedModel = true;
-
-    final modelService = Provider.of<SherpaModelService>(context, listen: false);
-    
-    // 检查模型是否准备好
-    final isReady = await modelService.checkModelReady();
-    
-    if (!isReady && mounted) {
-      // 检查是否有手动文件
-      final hasManualFile = await modelService.checkManualModelFile();
-      
-      if (hasManualFile) {
-        // 如果有手动文件，自动使用
-        await modelService.useManualModelFile();
-      } else {
-        // 如果没有模型文件，弹出选择对话框
-        await ModelDownloadChoiceDialog.showChoiceDialog(
-          context,
-          modelService,
-        );
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -189,36 +149,10 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-          body: _buildBody(controller), // 使用辅助方法构建 body
-          floatingActionButton: _buildFloatingActionButtons(controller), // 将 controller 传递下去
+          body: _buildMainContent(controller),
+          floatingActionButton: _buildFloatingActionButtons(controller),
         );
       },
-    );
-  }
-
-  // Body 的构建逻辑
-  Widget _buildBody(HomeController controller) {
-    return Column(
-      children: [
-        // 模型下载状态显示
-        Consumer<SherpaModelService>(
-          builder: (context, modelService, child) {
-            if (modelService.isDownloading || modelService.isUnzipping) {
-              return _buildDownloadStatusCard(modelService);
-            } else if (modelService.errorMessage.isNotEmpty) {
-              return _buildErrorStatusCard(modelService);
-            } else if (!modelService.isModelReady) {
-              return _buildModelNotReadyCard(modelService);
-            }
-            return const SizedBox.shrink();
-          },
-        ),
-        
-        // 原有的内容
-        Expanded(
-          child: _buildMainContent(controller),
-        ),
-      ],
     );
   }
 
@@ -250,202 +184,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildDownloadStatusCard(SherpaModelService modelService) {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      child: Card(
-        color: Colors.blue.shade50,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.download, color: Colors.blue),
-                  const SizedBox(width: 8),
-                  Text(
-                    modelService.isDownloading ? '正在下载语音模型...' : '正在解压语音模型...',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              LinearProgressIndicator(
-                value: modelService.isDownloading 
-                    ? modelService.progress 
-                    : modelService.unzipProgress,
-                backgroundColor: Colors.grey.shade300,
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '${((modelService.isDownloading ? modelService.progress : modelService.unzipProgress) * 100).toStringAsFixed(1)}%',
-                style: TextStyle(color: Colors.grey.shade600),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildErrorStatusCard(SherpaModelService modelService) {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      child: Card(
-        color: Colors.red.shade50,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.error, color: Colors.red),
-                  const SizedBox(width: 8),
-                  const Text(
-                    '语音模型下载失败',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                modelService.errorMessage,
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-              ),
-              const SizedBox(height: 12),
-              ElevatedButton.icon(
-                onPressed: () async {
-                  await modelService.downloadAndPrepareModel();
-                },
-                icon: const Icon(Icons.refresh),
-                label: const Text('重试下载'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildModelNotReadyCard(SherpaModelService modelService) {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      child: Card(
-        color: Colors.orange.shade50,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.warning, color: Colors.orange),
-                  const SizedBox(width: 8),
-                  const Text(
-                    '语音模型未准备好',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                '需要下载语音识别模型才能使用语音记账功能',
-                style: TextStyle(color: Colors.grey),
-              ),
-              const SizedBox(height: 16),
-              
-              // 选择下载方式
-              const Text(
-                '请选择下载方式：',
-                style: TextStyle(
-                  fontWeight: FontWeight.w500,
-                  fontSize: 14,
-                ),
-              ),
-              const SizedBox(height: 12),
-              
-              // 在线下载按钮
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () async {
-                    await modelService.startOnlineDownload();
-                  },
-                  icon: const Icon(Icons.cloud_download),
-                  label: const Text('在线下载（约40-50MB）'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                ),
-              ),
-              
-              const SizedBox(height: 8),
-              
-              // 手动下载按钮
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    showDialog(
-                      context: Get.context!,
-                      builder: (context) => ManualModelDialog(
-                        modelName: "sherpa-onnx-streaming-zipformer-small-ctc-zh-2025-04-01",
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.folder_open),
-                  label: const Text('手动下载（推荐网络较慢时使用）'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.orange,
-                    side: const BorderSide(color: Colors.orange),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                ),
-              ),
-              
-              const SizedBox(height: 12),
-              
-              // 提示信息
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: Colors.blue.shade200),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline, 
-                         color: Colors.blue.shade700, size: 16),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '如果在线下载速度较慢，建议选择手动下载',
-                        style: TextStyle(
-                          color: Colors.blue.shade700,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 

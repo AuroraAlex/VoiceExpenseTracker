@@ -92,9 +92,7 @@ flutter:
   assets:
     - .env
     - assets/
-    # 模型文件不再打包进应用，用户需要在线下载
-    # - assets/models/sherpa-onnx-streaming-zipformer-small-ctc-zh-2025-04-01/
-    # - assets/models/sherpa-onnx-streaming-zipformer-small-ctc-zh-2025-04-01/test_wavs/
+    - assets/models/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
