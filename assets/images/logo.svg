@@ -1,0 +1,19 @@
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 麦克风主体 -->
+  <rect x="52" y="35" width="16" height="28" rx="8" fill="white"/>
+  
+  <!-- 麦克风底座 -->
+  <path d="M45 55 Q45 70 60 70 Q75 70 75 55" stroke="white" stroke-width="3" fill="none"/>
+  <line x1="60" y1="70" x2="60" y2="80" stroke="white" stroke-width="3"/>
+  <line x1="50" y1="80" x2="70" y2="80" stroke="white" stroke-width="3"/>
+  
+  <!-- 声波装饰 -->
+  <path d="M35 50 Q35 45 40 45 Q35 45 35 40" stroke="white" stroke-width="3" fill="none"/>
+  <path d="M85 50 Q85 45 80 45 Q85 45 85 40" stroke="white" stroke-width="3" fill="none"/>
+  <path d="M30 55 Q30 45 40 45 Q30 45 30 35" stroke="white" stroke-width="3" fill="none"/>
+  <path d="M90 55 Q90 45 80 45 Q90 45 90 35" stroke="white" stroke-width="3" fill="none"/>
+  
+  <!-- 金钱符号装饰 -->
+  <circle cx="75" cy="35" r="8" fill="white"/>
+  <path d="M72 32 L72 38 M78 32 L78 38 M70 34 L80 34 M70 36 L80 36" stroke="#1976D2" stroke-width="1.5"/>
+</svg>

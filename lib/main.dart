@@ -9,6 +9,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
+import 'ui/screens/splash_screen.dart';
 import 'ui/screens/home_screen.dart';
 import 'ui/screens/sherpa_test_screen.dart';
 import 'ui/screens/text_input_test_screen.dart';
@@ -247,9 +248,10 @@ class _MyAppState extends State<MyApp> {
         ),
       ),
       themeMode: ThemeMode.system,
-      home: const HomeScreen(),
+      home: const SplashScreen(),
       debugShowCheckedModeBanner: false,
       routes: {
+        '/home': (context) => const HomeScreen(),
         '/sherpa_test': (context) => const SherpaTestScreen(),
         '/text_input_test': (context) => const TextInputTestScreen(),
         '/vehicle_expense_detail': (context) => const VehicleExpenseDetailScreen(),
